@@ -155,8 +155,12 @@ async def _call_openai_compatible(
         url = f"{base_url}/chat/completions"
     else:
         url = f"{base_url}/v1/chat/completions"
+    api_key_clean = api_key.strip()
+    if api_key_clean.lower().startswith("bearer "):
+        api_key_clean = api_key_clean[7:].strip()
+
     headers = {
-        "Authorization": f"Bearer {api_key}",
+        "Authorization": f"Bearer {api_key_clean}",
         "Content-Type": "application/json",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
     }
