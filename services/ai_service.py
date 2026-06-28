@@ -264,6 +264,9 @@ async def generate_article(
             })
             raise e1
 
+        # Berikan jeda waktu untuk menghindari rate limit / deteksi bot dari Cloudflare
+        await asyncio.sleep(3)
+
         # ── Langkah 2: Role = Content Writer ──
         system_2 = "Kamu adalah Content Writer."
         prompt_2 = f"Tulis artikel blog utuh, panjang, dan humanis berdasarkan kerangka ini: {outline}. Jangan gunakan HTML dulu, KECUALI jika perlu menyematkan peta lokasi, gunakan penanda khusus format: [MAPS: Nama Lokasi atau Alamat Lengkap]."
@@ -283,6 +286,9 @@ async def generate_article(
                 "status": "GAGAL"
             })
             raise e2
+
+        # Berikan jeda waktu sebelum memformat ke HTML
+        await asyncio.sleep(3)
 
         # ── Langkah 3: Role = Web Publisher ──
         system_3 = "Kamu adalah Web Publisher."
