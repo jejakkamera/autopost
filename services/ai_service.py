@@ -183,8 +183,18 @@ async def _call_openai_compatible(
         elif response.status_code == 401:
             raise Exception("INVALID_KEY: API Key tidak valid. Periksa di menu Pengaturan.")
         elif response.status_code != 200:
-            error_data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {}
-            error_msg = error_data.get("error", {}).get("message", response.text[:200])
+            error_msg = response.text[:200]
+            if response.headers.get("content-type", "").startswith("application/json"):
+                try:
+                    error_data = response.json()
+                    error_msg = error_data.get("error", {}).get("message", error_msg)
+                except Exception:
+                    pass
+            
+            # Jika response berupa HTML (Cloudflare block/timeout)
+            if error_msg.strip().startswith("<!DOCTYPE") or "cloudflare" in error_msg.lower():
+                error_msg = "Cloudflare Timeout / Block (Kemungkinan penulisan nama Model salah, server lambat/down, atau limit IP terpicu)"
+                
             raise Exception(f"API_ERROR: {error_msg}")
 
         data = response.json()
