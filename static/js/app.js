@@ -310,12 +310,21 @@ async function handleGenerate(event) {
                 dual_language: dualLanguage
             }),
         });
-        const data = await response.json();
-
         if (!response.ok) {
-            const detail = data.detail || data;
-            throw new Error(detail.message || 'Terjadi kesalahan yang tidak diketahui.');
+            let errorText = `Terjadi kesalahan pada server (HTTP ${response.status})`;
+            if (response.status === 504) {
+                errorText = "Proses AI Timeout (504). Waktu pengerjaan melebihi batas default Nginx (60s). Silakan tingkatkan proxy_read_timeout di Nginx Proxy Manager.";
+            } else {
+                try {
+                    const errorData = await response.json();
+                    const detail = errorData.detail || errorData;
+                    errorText = detail.message || errorText;
+                } catch (_) {}
+            }
+            throw new Error(errorText);
         }
+
+        const data = await response.json();
 
         showResult(data);
         showToast(`Artikel "${data.title}" berhasil dipublikasikan! 🎉`, 'success');
@@ -1290,18 +1299,25 @@ async function runScheduleBatch() {
             }),
         });
 
-        document.getElementById('scheduleProgressBar').style.width = '100%';
-        const data = await response.json();
-
-        if (response.ok) {
-            showToast(data.message || 'Antrean berhasil disimpan!', 'success');
-            clearAllTopics(); // Kosongkan input setelah sukses
-            loadScheduleQueue(); // Muat ulang tabel antrean aktif
-            document.getElementById('schedulePreview').classList.add('hidden'); // Sembunyikan preview
-        } else {
-            const errMsg = data.detail?.message || data.message || 'Terjadi kesalahan.';
-            showToast(`❌ ${errMsg}`, 'error');
+        if (!response.ok) {
+            let errorText = `Terjadi kesalahan (HTTP ${response.status})`;
+            if (response.status === 504) {
+                errorText = "Server Timeout (504): Penjadwalan batch memakan waktu terlalu lama. Silakan tingkatkan proxy_read_timeout di Nginx Proxy Manager.";
+            } else {
+                try {
+                    const data = await response.json();
+                    errorText = data.detail?.message || data.message || errorText;
+                } catch (_) {}
+            }
+            showToast(`❌ ${errorText}`, 'error');
+            return;
         }
+
+        const data = await response.json();
+        showToast(data.message || 'Antrean berhasil disimpan!', 'success');
+        clearAllTopics(); // Kosongkan input setelah sukses
+        loadScheduleQueue(); // Muat ulang tabel antrean aktif
+        document.getElementById('schedulePreview').classList.add('hidden'); // Sembunyikan preview
 
     } catch (error) {
         showToast('❌ Gagal terhubung ke server.', 'error');
