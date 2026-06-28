@@ -65,5 +65,22 @@ async def init_db():
             )
         """)
 
+        # Tabel scheduler_queue: menyimpan antrean jadwal postingan
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS scheduler_queue (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                topic TEXT NOT NULL,
+                scheduled_at TEXT NOT NULL,
+                language TEXT NOT NULL,
+                search_grounding INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'PENDING',
+                title TEXT,
+                post_id TEXT,
+                article_url TEXT,
+                error_message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         await db.commit()
         print("✅ Database initialized successfully.")

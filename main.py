@@ -27,12 +27,31 @@ PUBLIC_PATHS = {
 PUBLIC_PREFIXES = ("/static/",)
 
 
+import asyncio
+from services.scheduler_service import process_pending_schedule_queue
+
+
+async def schedule_worker():
+    """Background worker untuk memproses antrean jadwal artikel."""
+    print("⏳ Scheduler worker aktif (setiap 60 detik).")
+    while True:
+        try:
+            await process_pending_schedule_queue()
+        except Exception as e:
+            print(f"❌ Error dalam schedule worker: {e}")
+        await asyncio.sleep(60)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle: inisialisasi database saat startup."""
     await init_db()
+    # Mulai background scheduler worker
+    worker_task = asyncio.create_task(schedule_worker())
     print(f"🚀 AutoBlog AI berjalan di http://{settings.HOST}:{settings.PORT}")
     yield
+    # Batalkan task saat shutdown
+    worker_task.cancel()
     print("👋 AutoBlog AI berhenti.")
 
 

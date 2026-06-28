@@ -29,14 +29,17 @@ class Settings:
     # OAuth2
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
     GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
-    OAUTH_REDIRECT_URI: str = "http://localhost:8000/api/auth/callback"
+    OAUTH_REDIRECT_URI: str = os.getenv(
+        "OAUTH_REDIRECT_URI", "http://localhost:8000/api/auth/callback"
+    )
     OAUTH_SCOPES: list = [
         "https://www.googleapis.com/auth/blogger",
     ]
 
     # Database
-    DATABASE_PATH: str = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "database.db"
+    DATABASE_PATH: str = os.getenv(
+        "DATABASE_PATH",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "database.db")
     )
 
     # Paths

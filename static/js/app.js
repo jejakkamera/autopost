@@ -275,6 +275,7 @@ function switchTab(tab) {
     }
 
     if (tab === 'history') loadHistory();
+    if (tab === 'schedule') loadScheduleQueue();
 }
 
 // ============================================
@@ -1268,21 +1269,13 @@ async function runScheduleBatch() {
     btn.disabled = true;
     btn.innerHTML = `
         <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-        Memproses...
+        Mengantrekan...
     `;
     
     const totalArticles = dualLanguage ? topics.length * 2 : topics.length;
     document.getElementById('scheduleProgress').classList.remove('hidden');
-    document.getElementById('scheduleResults').classList.add('hidden');
-    document.getElementById('scheduleProgressBar').style.width = '10%';
-    document.getElementById('scheduleProgressText').textContent = `Memproses ${topics.length} topik (${totalArticles} artikel)... Harap tunggu.`;
-
-    // Animate progress
-    let progress = 10;
-    const progressInterval = setInterval(() => {
-        progress = Math.min(progress + 2, 90);
-        document.getElementById('scheduleProgressBar').style.width = `${progress}%`;
-    }, 3000);
+    document.getElementById('scheduleProgressBar').style.width = '30%';
+    document.getElementById('scheduleProgressText').textContent = `Memasukkan ${topics.length} topik (${totalArticles} artikel) ke antrean...`;
 
     try {
         const response = await fetch('/api/schedule-batch', {
@@ -1297,21 +1290,20 @@ async function runScheduleBatch() {
             }),
         });
 
-        clearInterval(progressInterval);
         document.getElementById('scheduleProgressBar').style.width = '100%';
-
         const data = await response.json();
 
         if (response.ok) {
-            renderScheduleResults(data);
-            showToast(data.message || 'Penjadwalan selesai!', data.status === 'success' ? 'success' : 'warning');
+            showToast(data.message || 'Antrean berhasil disimpan!', 'success');
+            clearAllTopics(); // Kosongkan input setelah sukses
+            loadScheduleQueue(); // Muat ulang tabel antrean aktif
+            document.getElementById('schedulePreview').classList.add('hidden'); // Sembunyikan preview
         } else {
             const errMsg = data.detail?.message || data.message || 'Terjadi kesalahan.';
             showToast(`❌ ${errMsg}`, 'error');
         }
 
     } catch (error) {
-        clearInterval(progressInterval);
         showToast('❌ Gagal terhubung ke server.', 'error');
     } finally {
         // Reset button
@@ -1322,62 +1314,130 @@ async function runScheduleBatch() {
         `;
         setTimeout(() => {
             document.getElementById('scheduleProgress').classList.add('hidden');
-        }, 1500);
+        }, 1000);
     }
 }
 
 /**
- * Render the schedule batch results table.
+ * Fetch and render all active items in the database schedule queue.
  */
-function renderScheduleResults(data) {
-    const tbody = document.getElementById('scheduleResultsBody');
-    tbody.innerHTML = '';
+async function loadScheduleQueue() {
+    const tbody = document.getElementById('scheduleQueueBody');
+    if (!tbody) return;
 
-    const badges = document.getElementById('scheduleResultBadges');
-    badges.innerHTML = `
-        <span class="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-semibold">${data.total_scheduled} Terjadwal</span>
-        <span class="px-2.5 py-1 rounded-lg bg-red-500/10 text-red-400 text-xs font-semibold">${data.total_failed} Gagal</span>
-    `;
+    try {
+        const response = await fetch('/api/schedule-queue');
+        const data = await response.json();
 
-    data.schedule.forEach((item, idx) => {
-        const statusClass = item.status === 'TERJADWAL'
-            ? 'bg-emerald-500/10 text-emerald-400'
-            : 'bg-red-500/10 text-red-400';
-        const langClass = item.language === 'Indonesia'
-            ? 'bg-emerald-500/10 text-emerald-400'
-            : 'bg-blue-500/10 text-blue-400';
-        const langFlag = item.language === 'Indonesia' ? '🇮🇩' : '🇬🇧';
-
-        let scheduledDisplay = '-';
-        if (item.scheduled_at) {
-            try {
-                const d = new Date(item.scheduled_at);
-                scheduledDisplay = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-            } catch(e) {
-                scheduledDisplay = item.scheduled_at;
+        if (response.ok && data.data) {
+            const queue = data.data;
+            if (queue.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-5 py-8 text-center text-gray-500">
+                            Belum ada antrean jadwal penerbitan.
+                        </td>
+                    </tr>
+                `;
+                return;
             }
+
+            tbody.innerHTML = '';
+            queue.forEach((item, idx) => {
+                let scheduledDisplay = '-';
+                if (item.scheduled_at) {
+                    try {
+                        const d = new Date(item.scheduled_at);
+                        scheduledDisplay = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                    } catch(e) {
+                        scheduledDisplay = item.scheduled_at;
+                    }
+                }
+
+                // Badge status styling
+                let statusClass = 'bg-gray-500/10 text-gray-400';
+                if (item.status === 'PENDING') statusClass = 'bg-accent-orange/10 text-accent-orange';
+                else if (item.status === 'GENERATING') statusClass = 'bg-accent-purple/10 text-accent-purple animate-pulse';
+                else if (item.status === 'SUKSES') statusClass = 'bg-emerald-500/10 text-emerald-400';
+                else if (item.status === 'GAGAL') statusClass = 'bg-red-500/10 text-red-400';
+
+                const langClass = item.language === 'Indonesia'
+                    ? 'bg-emerald-500/10 text-emerald-400'
+                    : 'bg-blue-500/10 text-blue-400';
+                const langFlag = item.language === 'Indonesia' ? '🇮🇩' : '🇬🇧';
+
+                // Topic title link (if success)
+                const titleDisplay = item.title
+                    ? (item.article_url ? `<a href="${item.article_url}" target="_blank" class="text-accent-cyan hover:underline">${escapeHtml(item.title)}</a>` : escapeHtml(item.title))
+                    : '<span class="text-gray-600">-</span>';
+
+                // Cancel button only for PENDING status
+                let actionBtn = '<span class="text-gray-600">-</span>';
+                if (item.status === 'PENDING') {
+                    actionBtn = `
+                        <button onclick="cancelScheduleItem(${item.id})" class="px-2.5 py-1 rounded bg-red-500/10 hover:bg-red-500/25 text-red-400 text-xs font-semibold transition-colors" title="Batalkan jadwal">
+                            Batal
+                        </button>
+                    `;
+                }
+
+                const errorTooltip = item.error_message ? ` title="${escapeHtml(item.error_message)}"` : '';
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-white/5 transition-colors">
+                        <td class="px-5 py-3 text-gray-500">${idx + 1}</td>
+                        <td class="px-5 py-3 text-gray-200 max-w-[180px] truncate" title="${escapeHtml(item.topic)}">${escapeHtml(item.topic)}</td>
+                        <td class="px-5 py-3"><span class="px-2 py-0.5 rounded-md ${langClass} text-xs font-medium">${langFlag} ${item.language}</span></td>
+                        <td class="px-5 py-3 text-gray-400 text-xs">${scheduledDisplay} WIB</td>
+                        <td class="px-5 py-3"><span class="px-2 py-0.5 rounded-md ${statusClass} text-xs font-semibold cursor-default"${errorTooltip}>${item.status}</span></td>
+                        <td class="px-5 py-3">${actionBtn}</td>
+                    </tr>
+                `;
+            });
+        } else {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="px-5 py-8 text-center text-red-400">
+                        Gagal memuat antrean jadwal dari server.
+                    </td>
+                </tr>
+            `;
         }
-
-        const titleDisplay = item.title
-            ? (item.article_url ? `<a href="${item.article_url}" target="_blank" class="text-accent-cyan hover:underline">${escapeHtml(item.title)}</a>` : escapeHtml(item.title))
-            : '<span class="text-gray-600">-</span>';
-
-        const errorTooltip = item.error ? ` title="${escapeHtml(item.error)}"` : '';
-
-        tbody.innerHTML += `
-            <tr class="hover:bg-white/5 transition-colors">
-                <td class="px-5 py-3 text-gray-500">${idx + 1}</td>
-                <td class="px-5 py-3 text-gray-200 max-w-[180px] truncate">${escapeHtml(item.topic)}</td>
-                <td class="px-5 py-3"><span class="px-2 py-0.5 rounded-md ${langClass} text-xs font-medium">${langFlag} ${item.language}</span></td>
-                <td class="px-5 py-3 text-gray-300 max-w-[200px] truncate">${titleDisplay}</td>
-                <td class="px-5 py-3 text-gray-400 text-xs">${scheduledDisplay}</td>
-                <td class="px-5 py-3"><span class="px-2 py-0.5 rounded-md ${statusClass} text-xs font-semibold cursor-default"${errorTooltip}>${item.status}</span></td>
+    } catch(err) {
+        console.error("Queue load error:", err);
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="px-5 py-8 text-center text-red-400">
+                    Koneksi error. Gagal memuat antrean.
+                </td>
             </tr>
         `;
-    });
-
-    document.getElementById('scheduleResults').classList.remove('hidden');
+    }
 }
+
+/**
+ * Cancel and delete a schedule item from the queue database.
+ */
+async function cancelScheduleItem(id) {
+    if (!confirm("Apakah Anda yakin ingin membatalkan jadwal rilis artikel ini?")) return;
+
+    try {
+        const response = await fetch(`/api/schedule-queue/${id}`, {
+            method: 'DELETE'
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            showToast("📅 Antrean berhasil dibatalkan.", "success");
+            loadScheduleQueue();
+        } else {
+            showToast(data.message || "Gagal membatalkan antrean.", "error");
+        }
+    } catch (err) {
+        showToast("❌ Gagal terhubung ke server.", "error");
+    }
+}
+
 
 /**
  * Helper: escape HTML entities.

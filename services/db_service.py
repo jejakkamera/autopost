@@ -249,3 +249,119 @@ async def delete_oauth_token():
         await db.commit()
     finally:
         await db.close()
+
+
+# ============================================
+# Scheduler Queue CRUD
+# ============================================
+
+async def add_to_schedule_queue(
+    topic: str,
+    scheduled_at: str,
+    language: str,
+    search_grounding: bool = False,
+) -> int:
+    """Menambahkan item penjadwalan baru ke antrean."""
+    db = await get_db()
+    try:
+        cursor = await db.execute("""
+            INSERT INTO scheduler_queue (topic, scheduled_at, language, search_grounding, status)
+            VALUES (?, ?, ?, ?, 'PENDING')
+        """, (topic, scheduled_at, language, 1 if search_grounding else 0))
+        await db.commit()
+        return cursor.lastrowid
+    finally:
+        await db.close()
+
+
+async def get_pending_schedule_items() -> List[Dict]:
+    """Mengambil semua item PENDING yang scheduled_at <= waktu sekarang."""
+    db = await get_db()
+    try:
+        # Gunakan string comparison karena ISO 8601 terurut secara alfabetis/leksikografis
+        # Tapi untuk meminimalkan masalah zona waktu, kita akan filter menggunakan datetime lokal di Python,
+        # jadi kita tarik semua PENDING dulu dan filter di level Python, atau gunakan string comparison.
+        # Format ISO 8601: YYYY-MM-DDTHH:MM:SS+HH:MM.
+        # Tarik semua PENDING dulu agar aman dengan manipulasi datetime di Python.
+        cursor = await db.execute("""
+            SELECT id, topic, scheduled_at, language, search_grounding, status
+            FROM scheduler_queue
+            WHERE status = 'PENDING'
+            ORDER BY scheduled_at ASC
+        """)
+        rows = await cursor.fetchall()
+        return [
+            {
+                "id": row[0],
+                "topic": row[1],
+                "scheduled_at": row[2],
+                "language": row[3],
+                "search_grounding": bool(row[4]),
+                "status": row[5],
+            }
+            for row in rows
+        ]
+    finally:
+        await db.close()
+
+
+async def update_schedule_item(
+    item_id: int,
+    status: str,
+    title: Optional[str] = None,
+    post_id: Optional[str] = None,
+    article_url: Optional[str] = None,
+    error_message: Optional[str] = None,
+):
+    """Mengupdate status dan data hasil pengerjaan item antrean."""
+    db = await get_db()
+    try:
+        await db.execute("""
+            UPDATE scheduler_queue
+            SET status = ?, title = ?, post_id = ?, article_url = ?, error_message = ?
+            WHERE id = ?
+        """, (status, title, post_id, article_url, error_message, item_id))
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def get_all_schedule_queue() -> List[Dict]:
+    """Mengambil semua daftar antrean untuk ditampilkan di UI."""
+    db = await get_db()
+    try:
+        cursor = await db.execute("""
+            SELECT id, topic, scheduled_at, language, search_grounding, status, title, post_id, article_url, error_message, created_at
+            FROM scheduler_queue
+            ORDER BY scheduled_at ASC
+        """)
+        rows = await cursor.fetchall()
+        return [
+            {
+                "id": row[0],
+                "topic": row[1],
+                "scheduled_at": row[2],
+                "language": row[3],
+                "search_grounding": bool(row[4]),
+                "status": row[5],
+                "title": row[6],
+                "post_id": row[7],
+                "article_url": row[8],
+                "error_message": row[9],
+                "created_at": row[10],
+            }
+            for row in rows
+        ]
+    finally:
+        await db.close()
+
+
+async def delete_schedule_item(item_id: int):
+    """Menghapus item dari antrean (membatalkan)."""
+    db = await get_db()
+    try:
+        await db.execute("DELETE FROM scheduler_queue WHERE id = ?", (item_id,))
+        await db.commit()
+    finally:
+        await db.close()
+
