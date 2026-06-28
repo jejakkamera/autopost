@@ -150,7 +150,11 @@ async def _call_openai_compatible(
     api_key: str, system_prompt: str, user_prompt: str, model: str, base_url: str
 ) -> str:
     """Panggil OpenAI-compatible API (OpenAI, DeepSeek, SumoPod, Custom)."""
-    url = f"{base_url}/v1/chat/completions"
+    base_url = base_url.rstrip("/")
+    if base_url.endswith("/v1"):
+        url = f"{base_url}/chat/completions"
+    else:
+        url = f"{base_url}/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
