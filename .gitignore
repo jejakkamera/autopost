@@ -1,0 +1,30 @@
+# Environment
+.env
+__pycache__/
+*.pyc
+*.pyo
+
+# Database
+database.db
+
+# OAuth Credentials
+credentials/
+token.json
+client_secret_*.json
+
+# Virtual Environment
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

@@ -1,0 +1,331 @@
+/**
+ * AutoBlog AI — Custom Styles
+ * Glassmorphism, loading animations, orbs, and custom UI effects.
+ */
+
+/* ============================================
+   Base & Reset
+   ============================================ */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(139, 92, 246, 0.3) transparent;
+}
+
+*::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: rgba(139, 92, 246, 0.3);
+    border-radius: 3px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: rgba(139, 92, 246, 0.5);
+}
+
+/* ============================================
+   Glassmorphism Card
+   ============================================ */
+.glass-card {
+    background: rgba(15, 15, 35, 0.7);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+/* ============================================
+   Background Gradient Orbs
+   ============================================ */
+.orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(100px);
+    opacity: 0.15;
+    animation: orbFloat 20s ease-in-out infinite;
+}
+
+.orb-1 {
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, #8b5cf6, transparent 70%);
+    top: -150px;
+    right: -100px;
+    animation-delay: 0s;
+}
+
+.orb-2 {
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, #3b82f6, transparent 70%);
+    bottom: -100px;
+    left: -100px;
+    animation-delay: -7s;
+}
+
+.orb-3 {
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle, #06b6d4, transparent 70%);
+    top: 50%;
+    left: 50%;
+    animation-delay: -14s;
+}
+
+@keyframes orbFloat {
+    0%, 100% {
+        transform: translate(0, 0) scale(1);
+    }
+    25% {
+        transform: translate(50px, -30px) scale(1.1);
+    }
+    50% {
+        transform: translate(-30px, 50px) scale(0.95);
+    }
+    75% {
+        transform: translate(-50px, -20px) scale(1.05);
+    }
+}
+
+/* ============================================
+   Tab Buttons
+   ============================================ */
+.tab-btn.tab-active {
+    background: rgba(139, 92, 246, 0.15);
+    color: #c4b5fd;
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.1);
+}
+
+/* ============================================
+   Loading Spinner
+   ============================================ */
+.loading-spinner {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+}
+
+.spinner-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    animation: spinRing 1.5s linear infinite;
+}
+
+.spinner-ring:nth-child(1) {
+    border-top-color: #8b5cf6;
+    animation-delay: 0s;
+}
+
+.spinner-ring:nth-child(2) {
+    border-right-color: #3b82f6;
+    animation-delay: 0.15s;
+    inset: 3px;
+}
+
+.spinner-ring:nth-child(3) {
+    border-bottom-color: #06b6d4;
+    animation-delay: 0.3s;
+    inset: 6px;
+}
+
+@keyframes spinRing {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ============================================
+   Step Indicator
+   ============================================ */
+.step-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    flex-shrink: 0;
+    transition: all 0.3s ease;
+}
+
+.step-indicator.active {
+    background: rgba(139, 92, 246, 0.3);
+    border-color: #8b5cf6;
+    box-shadow: 0 0 12px rgba(139, 92, 246, 0.4);
+    animation: stepPulse 2s ease-in-out infinite;
+}
+
+.step-indicator.done {
+    background: #10b981;
+    border-color: #10b981;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
+}
+
+@keyframes stepPulse {
+    0%, 100% {
+        box-shadow: 0 0 8px rgba(139, 92, 246, 0.3);
+    }
+    50% {
+        box-shadow: 0 0 20px rgba(139, 92, 246, 0.6);
+    }
+}
+
+/* ============================================
+   Pulse Glow (Loading Card)
+   ============================================ */
+.animate-pulse-glow {
+    animation: pulseGlow 2s ease-in-out infinite;
+}
+
+@keyframes pulseGlow {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(139, 92, 246, 0);
+    }
+    50% {
+        box-shadow: 0 0 30px 0 rgba(139, 92, 246, 0.1);
+    }
+}
+
+/* ============================================
+   Modal Animation
+   ============================================ */
+.animate-modal-in {
+    animation: modalIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* ============================================
+   Toast Animation
+   ============================================ */
+.animate-toast-in {
+    animation: toastIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes toastIn {
+    from {
+        opacity: 0;
+        transform: translateX(100px) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
+}
+
+@keyframes toastOut {
+    from {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(100px) scale(0.9);
+    }
+}
+
+/* ============================================
+   Article Preview Styling
+   ============================================ */
+.article-preview h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #e2e8f0;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.article-preview h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #cbd5e1;
+    margin-top: 1.25rem;
+    margin-bottom: 0.5rem;
+}
+
+.article-preview p {
+    color: #94a3b8;
+    line-height: 1.75;
+    margin-bottom: 1rem;
+    font-size: 0.9375rem;
+}
+
+.article-preview strong {
+    color: #c4b5fd;
+    font-weight: 600;
+}
+
+.article-preview em {
+    color: #a5b4fc;
+    font-style: italic;
+}
+
+.article-preview ul,
+.article-preview ol {
+    padding-left: 1.5rem;
+    margin-bottom: 1rem;
+    color: #94a3b8;
+}
+
+.article-preview li {
+    margin-bottom: 0.5rem;
+    line-height: 1.6;
+}
+
+.article-preview ul li {
+    list-style-type: disc;
+}
+
+.article-preview ol li {
+    list-style-type: decimal;
+}
+
+/* ============================================
+   Select Dropdown Custom Arrow
+   ============================================ */
+select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%239ca3af' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 36px;
+}
+
+/* ============================================
+   Responsive Tweaks
+   ============================================ */
+@media (max-width: 640px) {
+    .orb {
+        opacity: 0.08;
+    }
+
+    .orb-1 {
+        width: 300px;
+        height: 300px;
+    }
+
+    .orb-2 {
+        width: 250px;
+        height: 250px;
+    }
+
+    .orb-3 {
+        display: none;
+    }
+}

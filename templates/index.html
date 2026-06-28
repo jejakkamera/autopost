@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AutoBlog AI — Aplikasi auto-posting ke Google Blogger menggunakan AI">
+    <title>AutoBlog AI — Blogger Auto-Posting</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        dark: {
+                            50: '#f0f0f5',
+                            100: '#e0e0eb',
+                            200: '#c2c2d6',
+                            300: '#9e9eb8',
+                            400: '#7a7a9c',
+                            500: '#56567e',
+                            600: '#3d3d66',
+                            700: '#2a2a4a',
+                            800: '#1a1a35',
+                            900: '#0f0f23',
+                            950: '#080815',
+                        },
+                        accent: {
+                            purple: '#8b5cf6',
+                            blue: '#3b82f6',
+                            cyan: '#06b6d4',
+                            green: '#10b981',
+                            red: '#ef4444',
+                            orange: '#f59e0b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- SheetJS for Excel parsing -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/style.css?v=1.3">
+</head>
+<body class="dark bg-dark-950 text-gray-100 font-sans min-h-screen">
+    <!-- Background Gradient Orbs -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none -z-10">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <!-- ═══════════ LOGIN OVERLAY ═══════════ -->
+    <div id="loginOverlay" class="fixed inset-0 z-[300] flex items-center justify-center bg-dark-950/95 backdrop-blur-xl hidden">
+        <div class="w-full max-w-md px-6">
+            <!-- Logo -->
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-accent-purple to-accent-blue flex items-center justify-center text-white font-bold text-2xl shadow-2xl shadow-accent-purple/30 mb-4">
+                    AI
+                </div>
+                <h1 class="text-2xl font-bold bg-gradient-to-r from-accent-purple to-accent-cyan bg-clip-text text-transparent">AutoBlog AI</h1>
+                <p class="text-gray-500 text-sm mt-2">Blogger Auto-Posting dengan AI</p>
+            </div>
+
+            <!-- Setup Form (first time) -->
+            <div id="loginSetupForm" class="glass-card rounded-2xl p-6 border border-white/10 hidden">
+                <h2 class="text-lg font-semibold mb-1">Buat Login Key</h2>
+                <p class="text-sm text-gray-400 mb-5">Pertama kali menggunakan? Buat key untuk mengamankan aplikasi Anda.</p>
+                <div class="mb-4">
+                    <label for="setupKeyInput" class="block text-sm font-medium text-gray-300 mb-2">Login Key</label>
+                    <input type="password" id="setupKeyInput" placeholder="Minimal 4 karakter" class="w-full px-4 py-3 bg-dark-900/60 border border-white/10 rounded-xl text-gray-100 placeholder-gray-500 focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all text-sm">
+                </div>
+                <div class="mb-5">
+                    <label for="setupKeyConfirm" class="block text-sm font-medium text-gray-300 mb-2">Konfirmasi Key</label>
+                    <input type="password" id="setupKeyConfirm" placeholder="Ulangi login key" class="w-full px-4 py-3 bg-dark-900/60 border border-white/10 rounded-xl text-gray-100 placeholder-gray-500 focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all text-sm">
+                </div>
+                <button onclick="handleSetupKey()" class="w-full py-3 rounded-xl font-semibold text-sm bg-gradient-to-r from-accent-purple to-accent-blue text-white hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-accent-purple/25">
+                    Buat & Masuk
+                </button>
+            </div>
+
+            <!-- Login Form -->
+            <div id="loginForm" class="glass-card rounded-2xl p-6 border border-white/10 hidden">
+                <h2 class="text-lg font-semibold mb-1">Login</h2>
+                <p class="text-sm text-gray-400 mb-5">Masukkan login key untuk mengakses aplikasi.</p>
+                <div class="mb-5">
+                    <label for="loginKeyInput" class="block text-sm font-medium text-gray-300 mb-2">Login Key</label>
+                    <input type="password" id="loginKeyInput" placeholder="Masukkan login key" 
+                        class="w-full px-4 py-3 bg-dark-900/60 border border-white/10 rounded-xl text-gray-100 placeholder-gray-500 focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all text-sm"
+                        onkeydown="if(event.key==='Enter') handleLogin()">
+                </div>
+                <button onclick="handleLogin()" id="loginBtn" class="w-full py-3 rounded-xl font-semibold text-sm bg-gradient-to-r from-accent-purple to-accent-blue text-white hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-accent-purple/25">
+                    Masuk
+                </button>
+                <p id="loginError" class="text-accent-red text-sm mt-3 hidden text-center"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ MAIN APP (hidden until auth) ═══════════ -->
+    <div id="mainApp" class="hidden">
+
+        <!-- ═══════════ NAVBAR ═══════════ -->
+        <nav class="sticky top-0 z-50 glass-card border-b border-white/5">
+            <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-accent-purple to-accent-blue flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-accent-purple/25">
+                        AI
+                    </div>
+                    <h1 class="text-lg font-bold bg-gradient-to-r from-accent-purple to-accent-cyan bg-clip-text text-transparent">
+                        AutoBlog AI
+                    </h1>
+                </div>
+                <div class="flex items-center gap-3">
+                    <!-- Auth Status Indicator -->
+                    <div id="authIndicator" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 text-sm cursor-pointer hover:bg-white/10 transition-all" onclick="openSettings()">
+                        <span id="authDot" class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                        <span id="authText" class="text-gray-400 hidden sm:inline">Belum Terhubung</span>
+                    </div>
+                    <!-- Settings Button -->
+                    <button onclick="openSettings()" class="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-all group" title="Pengaturan">
+                        <svg class="w-5 h-5 text-gray-400 group-hover:text-accent-purple transition-colors group-hover:rotate-90 duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                    </button>
+                    <!-- Logout -->
+                    <button onclick="handleLogout()" class="p-2 rounded-lg bg-white/5 hover:bg-accent-red/10 transition-all group" title="Logout">
+                        <svg class="w-5 h-5 text-gray-400 group-hover:text-accent-red transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- ═══════════ MAIN CONTENT ═══════════ -->
+        <main class="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+
+            <!-- Tab Navigation -->
+            <div class="flex gap-1 mb-6 p-1 bg-white/5 rounded-xl w-fit">
+                <button id="tabGenerate" onclick="switchTab('generate')" class="tab-btn tab-active px-5 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                    </svg>
+                    Generate
+                </button>
+                <button id="tabHistory" onclick="switchTab('history')" class="tab-btn px-5 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 text-gray-400 hover:text-gray-200">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Riwayat
+                </button>
+                <button id="tabSchedule" onclick="switchTab('schedule')" class="tab-btn px-5 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 text-gray-400 hover:text-gray-200">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    Jadwal Batch
+                </button>
+            </div>
+
+            <!-- ═══ TAB: GENERATE ═══ -->
+            <section id="sectionGenerate" class="space-y-6">
+                <!-- Input Card -->
+                <div class="glass-card rounded-2xl p-6 border border-white/5">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-purple/20 to-accent-blue/20 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-accent-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold">Generate Artikel</h2>
+                            <p id="providerLabel" class="text-sm text-gray-400">Menggunakan Google Gemini</p>
+                        </div>
+                    </div>
+
+                    <form id="generateForm" onsubmit="handleGenerate(event)">
+                        <div class="mb-4">
+                            <label for="topicInput" class="block text-sm font-medium text-gray-300 mb-2">Topik Artikel</label>
+                            <textarea id="topicInput" rows="3" placeholder="Contoh: Manfaat AI untuk pendidikan di era digital"
+                                class="w-full px-4 py-3 bg-dark-900/60 border border-white/10 rounded-xl text-gray-100 placeholder-gray-500 focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all resize-none text-sm"
+                                required></textarea>
+                        </div>
+
+                        <div class="flex flex-col sm:flex-row gap-4 items-stretch sm:items-end">
+                            <div class="flex-shrink-0">
+                                <label for="modeSelect" class="block text-sm font-medium text-gray-300 mb-2">Mode Publikasi</label>
+                                <select id="modeSelect" class="px-4 py-3 bg-dark-900/60 border border-white/10 rounded-xl text-gray-100 focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all text-sm appearance-none cursor-pointer min-w-[140px]">
+                                    <option value="draft">📝 Draft</option>
+                                    <option value="live">🚀 Live</option>
+                                </select>
+                            </div>
+                            <div class="flex-shrink-0 flex items-center h-[46px] sm:h-auto pb-0 sm:pb-3">
+                                <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-300 hover:text-gray-100 transition-colors">
+                                    <input type="checkbox" id="searchGroundingCheckbox" class="rounded border-white/10 bg-dark-900/60 text-accent-purple focus:ring-accent-purple/20 focus:ring-2 transition-all w-4 h-4">
+                                    <span>🌐 Cari info terbaru (Google Search)</span>
+                                </label>
+                            </div>
+                            <div class="flex-shrink-0 flex items-center h-[46px] sm:h-auto pb-0 sm:pb-3">
+                                <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-300 hover:text-gray-100 transition-colors">
+                                    <input type="checkbox" id="dualLanguageCheckbox" class="rounded border-white/10 bg-dark-900/60 text-accent-purple focus:ring-accent-purple/20 focus:ring-2 transition-all w-4 h-4">
+                                    <span>🌍 Dual Bahasa (Terjemah ke Inggris)</span>
+                                </label>
+                            </div>
+                            <div class="flex-grow flex items-end">
+                                <button id="generateBtn" type="submit"
+                                    class="w-full py-3 px-6 rounded-xl font-semibold text-sm bg-gradient-to-r from-accent-purple to-accent-blue text-white hover:opacity-90 active:scale-[0.98] transition-all duration-200 shadow-lg shadow-accent-purple/25 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                    </svg>
+                                    Generate & Publish
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Loading State -->
+                <div id="loadingCard" class="hidden glass-card rounded-2xl p-6 border border-accent-purple/20 animate-pulse-glow">
+                    <div class="flex items-center gap-4">
+                        <div class="loading-spinner"><div class="spinner-ring"></div><div class="spinner-ring"></div><div class="spinner-ring"></div></div>
+                        <div>
+                            <p id="loadingTitle" class="font-semibold text-accent-purple">Memproses...</p>
+                            <p id="loadingSubtitle" class="text-sm text-gray-400 mt-1">Menghubungi AI untuk generate artikel</p>
+                        </div>
+                    </div>
+                    <div class="mt-5 space-y-2">
+                        <div id="step1" class="flex items-center gap-3 text-sm"><div class="step-indicator active"></div><span class="text-gray-300">Mengirim topik ke AI...</span></div>
+                        <div id="step2" class="flex items-center gap-3 text-sm"><div class="step-indicator"></div><span class="text-gray-500">Memproses dan memformat artikel HTML...</span></div>
+                        <div id="step3" class="flex items-center gap-3 text-sm"><div class="step-indicator"></div><span class="text-gray-500">Mempublikasikan ke Blogger...</span></div>
+                    </div>
+                </div>
+
+                <!-- Result Card (Success) -->
+                <div id="resultCard" class="hidden glass-card rounded-2xl p-6 border border-accent-green/20">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-accent-green/10 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-accent-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-accent-green">Berhasil!</h3>
+                                <p id="resultTitle" class="text-sm text-gray-400">Artikel berhasil dipublikasikan</p>
+                            </div>
+                        </div>
+                        <a id="resultLink" href="#" target="_blank" class="px-4 py-2 rounded-lg bg-accent-green/10 text-accent-green text-sm font-medium hover:bg-accent-green/20 transition-all flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                            Lihat Artikel
+                        </a>
+                    </div>
+                    <div class="mt-4">
+                        <button onclick="togglePreview()" class="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-200 transition-colors mb-3">
+                            <svg id="previewChevron" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            Preview HTML
+                        </button>
+                        <div id="previewContent" class="hidden bg-dark-900/80 rounded-xl p-5 border border-white/5 max-h-96 overflow-y-auto article-preview"></div>
+                    </div>
+                </div>
+
+                <!-- Error Card -->
+                <div id="errorCard" class="hidden glass-card rounded-2xl p-6 border border-accent-red/20">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-accent-red/10 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-accent-red" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-accent-red">Gagal</h3>
+                            <p id="errorMessage" class="text-sm text-gray-400">Terjadi kesalahan saat memproses.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ═══ TAB: HISTORY ═══ -->
+            <section id="sectionHistory" class="hidden">
+                <div class="glass-card rounded-2xl border border-white/5 overflow-hidden">
+                    <div class="p-6 border-b border-white/5">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-cyan/20 to-accent-blue/20 flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-accent-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                </div>
+                                <div>
+                                    <h2 class="text-lg font-semibold">Riwayat Artikel</h2>
+                                    <p id="historyCount" class="text-sm text-gray-400">0 artikel</p>
+                                </div>
+                            </div>
+                            <button onclick="loadHistory()" class="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-all" title="Refresh">
+                                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <th class="px-6 py-3">#</th>
+                                    <th class="px-6 py-3">Tanggal</th>
+                                    <th class="px-6 py-3">Topik</th>
+                                    <th class="px-6 py-3">Mode</th>
+                                    <th class="px-6 py-3">Status</th>
+                                    <th class="px-6 py-3">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historyTableBody" class="divide-y divide-white/5">
+                                <tr><td colspan="6" class="px-6 py-12 text-center text-gray-500">
+                                    <svg class="w-12 h-12 mx-auto mb-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                                    Belum ada riwayat artikel
+                                </td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="historyPagination" class="hidden p-4 border-t border-white/5 flex items-center justify-between">
+                        <p id="paginationInfo" class="text-sm text-gray-500">Menampilkan 1-20 dari 0</p>
+                        <div class="flex gap-2">
+                            <button id="prevBtn" onclick="changePage(-1)" class="px-3 py-1.5 rounded-lg bg-white/5 text-sm text-gray-400 hover:bg-white/10 transition-all disabled:opacity-30" disabled>← Sebelumnya</button>
+                            <button id="nextBtn" onclick="changePage(1)" class="px-3 py-1.5 rounded-lg bg-white/5 text-sm text-gray-400 hover:bg-white/10 transition-all disabled:opacity-30" disabled>Selanjutnya →</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ═══ TAB: SCHEDULE BATCH ═══ -->
+            <section id="sectionSchedule" class="hidden space-y-6">
+                <!-- Form Card -->
+                <div class="glass-card rounded-2xl p-6 border border-white/5">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-orange/20 to-accent-red/20 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-accent-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold">Jadwal Batch</h2>
+                            <p class="text-sm text-gray-400">Buat & jadwalkan banyak artikel sekaligus (dual bahasa)</p>
+                        </div>
+                    </div>
+
+                    <!-- Topics Dynamic Inputs -->
+                    <div class="mb-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="block text-sm font-medium text-gray-300">Daftar Topik</label>
+                            <span id="topicCountBadge" class="px-2.5 py-0.5 rounded-full bg-accent-purple/10 text-accent-purple text-xs font-semibold">1 topik</span>
+                        </div>
+
+                        <!-- Topic Input List -->
+                        <div id="topicInputList" class="space-y-2 mb-3">
+                            <div class="topic-row flex items-center gap-2" data-index="0">
+                                <span class="text-xs text-gray-500 w-6 text-center flex-shrink-0">1</span>
+                                <input type="text" class="topic-input flex-1 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-100 placeholder-gray-600 focus:outline-none focus:border-accent-purple/50 focus:ring-1 focus:ring-accent-purple/30 transition-all text-sm" placeholder="Masukkan topik/prompt artikel...">
+                                <button onclick="removeTopicRow(this)" class="p-2 rounded-lg hover:bg-red-500/10 text-gray-500 hover:text-red-400 transition-all flex-shrink-0" title="Hapus topik">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="addTopicRow()" class="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-sm font-medium text-gray-300 hover:bg-white/10 hover:border-accent-purple/30 transition-all flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                                Tambah Topik
+                            </button>
+                            <label class="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-sm font-medium text-gray-300 hover:bg-white/10 hover:border-emerald-500/30 transition-all flex items-center gap-2 cursor-pointer">
+                                <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                Upload Excel
+                                <input type="file" id="excelUpload" accept=".xlsx,.xls,.csv" onchange="handleExcelUpload(event)" class="hidden">
+                            </label>
+                            <button onclick="clearAllTopics()" class="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-sm font-medium text-gray-400 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 transition-all flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                Hapus Semua
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-600 mt-2">💡 Excel harus punya kolom <strong>"topik"</strong> atau data di kolom pertama. Format: .xlsx, .xls, .csv | <a href="javascript:void(0)" onclick="downloadExcelTemplate()" class="text-accent-cyan hover:underline font-medium">Download Template Excel</a></p>
+                    </div>
+
+                    <!-- Date + Interval Row -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+                        <div>
+                            <label for="scheduleStartDate" class="block text-sm font-medium text-gray-300 mb-2">Tanggal Mulai</label>
+                            <input type="date" id="scheduleStartDate" class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-gray-100 focus:outline-none focus:border-accent-purple/50 focus:ring-1 focus:ring-accent-purple/30 transition-all text-sm">
+                        </div>
+                        <div>
+                            <label for="scheduleInterval" class="block text-sm font-medium text-gray-300 mb-2">Interval Antar Topik</label>
+                            <div class="relative">
+                                <input type="number" id="scheduleInterval" min="1" value="2" class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-gray-100 focus:outline-none focus:border-accent-purple/50 focus:ring-1 focus:ring-accent-purple/30 transition-all text-sm pr-16">
+                                <span class="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-500">hari</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Toggles Row -->
+                    <div class="flex flex-col sm:flex-row gap-4 mb-5 items-start">
+                        <div class="flex items-center h-6">
+                            <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-300 hover:text-gray-100 transition-colors">
+                                <input type="checkbox" id="scheduleSearchGrounding" class="rounded border-white/10 bg-dark-900/60 text-accent-purple focus:ring-accent-purple/20 focus:ring-2 transition-all w-4 h-4">
+                                <span>🌐 Cari info terbaru (Google Search)</span>
+                            </label>
+                        </div>
+                        <div class="flex items-center h-6">
+                            <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-300 hover:text-gray-100 transition-colors">
+                                <input type="checkbox" id="scheduleDualLanguage" class="rounded border-white/10 bg-dark-900/60 text-accent-purple focus:ring-accent-purple/20 focus:ring-2 transition-all w-4 h-4" checked>
+                                <span>🌍 Dual Bahasa (Terjemah ke Inggris)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Preview Button -->
+                    <button onclick="previewSchedule()" class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm font-medium text-gray-300 hover:bg-white/10 transition-all flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                        Preview Jadwal
+                    </button>
+                </div>
+
+                <!-- Preview Table -->
+                <div id="schedulePreview" class="hidden glass-card rounded-2xl border border-white/5 overflow-hidden">
+                    <div class="p-5 border-b border-white/5">
+                        <h3 class="text-sm font-semibold text-gray-300">📅 Preview Jadwal Rilis</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <th class="px-5 py-3">#</th>
+                                    <th class="px-5 py-3">Topik</th>
+                                    <th class="px-5 py-3">Bahasa</th>
+                                    <th class="px-5 py-3">Jadwal Rilis</th>
+                                </tr>
+                            </thead>
+                            <tbody id="schedulePreviewBody" class="divide-y divide-white/5 text-sm"></tbody>
+                        </table>
+                    </div>
+                    <div class="p-5 border-t border-white/5 flex flex-col sm:flex-row items-center gap-3">
+                        <button id="btnRunSchedule" onclick="runScheduleBatch()" class="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-accent-orange to-accent-red text-white font-semibold text-sm hover:shadow-lg hover:shadow-accent-orange/25 transition-all duration-300 flex items-center justify-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+                            Jadwalkan Semua
+                        </button>
+                        <p class="text-xs text-gray-500">Proses ini akan memakan waktu beberapa menit tergantung jumlah topik.</p>
+                    </div>
+                </div>
+
+                <!-- Progress & Results -->
+                <div id="scheduleProgress" class="hidden glass-card rounded-2xl p-6 border border-white/5">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div id="scheduleSpinner" class="w-5 h-5 border-2 border-accent-orange border-t-transparent rounded-full animate-spin"></div>
+                        <p id="scheduleProgressText" class="text-sm text-gray-300">Memproses jadwal batch...</p>
+                    </div>
+                    <div class="w-full bg-white/5 rounded-full h-2 overflow-hidden">
+                        <div id="scheduleProgressBar" class="h-full bg-gradient-to-r from-accent-orange to-accent-red rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Results Table -->
+                <div id="scheduleResults" class="hidden glass-card rounded-2xl border border-white/5 overflow-hidden">
+                    <div class="p-5 border-b border-white/5 flex items-center justify-between">
+                        <h3 id="scheduleResultTitle" class="text-sm font-semibold text-gray-300">Hasil Penjadwalan</h3>
+                        <div id="scheduleResultBadges" class="flex gap-2"></div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <th class="px-5 py-3">#</th>
+                                    <th class="px-5 py-3">Topik</th>
+                                    <th class="px-5 py-3">Bahasa</th>
+                                    <th class="px-5 py-3">Judul</th>
+                                    <th class="px-5 py-3">Jadwal</th>
+                                    <th class="px-5 py-3">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scheduleResultsBody" class="divide-y divide-white/5 text-sm"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- ═══════════ FOOTER ═══════════ -->
+        <footer class="mt-12 pb-6">
+            <div class="max-w-6xl mx-auto px-4 sm:px-6">
+                <div class="flex items-center justify-center gap-2 text-xs text-gray-600">
+                    <span>AutoBlog AI v1.0</span><span>·</span><span>Berjalan di localhost:8000</span>
+                </div>
+            </div>
+        </footer>
+    </div><!-- end mainApp -->
+
+    <!-- ═══════════ SETTINGS MODAL ═══════════ -->
+    <div id="settingsModal" class="fixed inset-0 z-[100] hidden">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeSettings()"></div>
+        <div class="absolute inset-0 flex items-center justify-center p-4">
+            <div class="glass-card rounded-2xl border border-white/10 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-modal-in">
+                <!-- Modal Header -->
+                <div class="flex items-center justify-between p-6 border-b border-white/5">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-accent-purple/20 to-accent-blue/20 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-accent-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        </div>
+                        <h2 class="text-lg font-semibold">Pengaturan</h2>
+                    </div>
+                    <button onclick="closeSettings()" class="p-2 rounded-lg hover:bg-white/10 transition-all">
+                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="p-6 space-y-5">
+                    <!-- AI Provider Selection -->
+                    <div>
+                        <label for="settingProvider" class="block text-sm font-medium text-gray-300 mb-2">AI Provider</label>
+                        <select id="settingProvider" onchange="onProviderChange()" class="w-full px-4 py-3 bg-dark-900/60 border border-white/10 rounded-xl text-gray-100 focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all text-sm appearance-none cursor-pointer">
+                            <option value="gemini">🤖 Google Gemini</option>
+                            <option value="deepseek">🧠 DeepSeek</option>
+                            <option value="openai">💬 OpenAI (GPT)</option>
+                            <option value="sumopod">⚡ SumoPod AI</option>
+                            <option value="custom">⚙️ Custom (OpenAI Compatible)</option>
+                        </select>
+                    </div>
+
+                    <!-- Custom API Base URL (only for custom provider) -->
+                    <div id="customUrlContainer" class="hidden">
+                        <label for="settingCustomUrl" class="block text-sm font-medium text-gray-300 mb-2">Custom Base URL</label>
+                        <input type="text" id="settingCustomUrl" placeholder="https://ai.sumopod.com"
+                            class="w-full px-4 py-3 bg-dark-900/60 border border-white/10 rounded-xl text-gray-100 placeholder-gray-500 focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all text-sm">
+                    </div>
+
+                    <!-- Custom API Model Name (only for custom provider) -->
+                    <div id="customModelContainer" class="hidden">
+                        <label for="settingCustomModel" class="block text-sm font-medium text-gray-300 mb-2">Custom Model Name</label>
+                        <input type="text" id="settingCustomModel" placeholder="gpt-4o-mini"
+                            class="w-full px-4 py-3 bg-dark-900/60 border border-white/10 rounded-xl text-gray-100 placeholder-gray-500 focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all text-sm">
+                    </div>
+
+                    <!-- AI Model Selection -->
+                    <div id="modelSelectContainer">
+                        <label for="settingModel" class="block text-sm font-medium text-gray-300 mb-2">Model</label>
+                        <select id="settingModel" class="w-full px-4 py-3 bg-dark-900/60 border border-white/10 rounded-xl text-gray-100 focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all text-sm appearance-none cursor-pointer">
+                            <!-- Populated by JavaScript -->
+                        </select>
+                    </div>
+
+
+                    <!-- API Key (dynamic per provider) -->
+                    <div>
+                        <label id="apiKeyLabel" for="settingApiKey" class="block text-sm font-medium text-gray-300 mb-2">API Key</label>
+                        <div class="relative">
+                            <input type="password" id="settingApiKey" placeholder="..."
+                                class="w-full px-4 py-3 pr-10 bg-dark-900/60 border border-white/10 rounded-xl text-gray-100 placeholder-gray-500 focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all text-sm">
+                            <button type="button" onclick="togglePasswordVisibility('settingApiKey')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            </button>
+                        </div>
+                        <div class="flex justify-between items-center mt-1.5">
+                            <p id="apiKeyHint" class="text-xs text-gray-500">Dapatkan di <a id="apiKeyUrl" href="#" target="_blank" class="text-accent-purple hover:underline">sini</a></p>
+                            <button onclick="testAIConnection()" id="testAIBtn" class="px-2.5 py-1 rounded bg-accent-purple/10 text-accent-purple text-xs font-semibold hover:bg-accent-purple/20 transition-all flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                Tes AI
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- AI Test Result -->
+                    <div id="aiTestResult" class="hidden p-3 rounded-xl border text-sm"></div>
+
+
+                    <!-- Divider: Blog ID -->
+                    <div class="border-t border-white/5 pt-5">
+                        <h3 class="text-sm font-medium text-gray-300 mb-3">Koneksi Blogger</h3>
+
+                        <!-- Blog ID + Verify -->
+                        <div class="mb-4">
+                            <label for="settingBlogId" class="block text-sm font-medium text-gray-300 mb-2">Blog ID</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="settingBlogId" placeholder="1234567890123456789"
+                                    class="flex-grow px-4 py-3 bg-dark-900/60 border border-white/10 rounded-xl text-gray-100 placeholder-gray-500 focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all text-sm">
+                                <button onclick="verifyBlogId()" id="verifyBlogBtn"
+                                    class="px-4 py-3 rounded-xl bg-accent-cyan/10 text-accent-cyan text-sm font-medium hover:bg-accent-cyan/20 transition-all whitespace-nowrap flex items-center gap-1.5">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                    Cek
+                                </button>
+                            </div>
+                            <p class="mt-1.5 text-xs text-gray-500">Dari URL: blogger.com/blog/posts/<strong>BLOG_ID</strong></p>
+                        </div>
+
+                        <!-- Blog Verify Result -->
+                        <div id="blogVerifyResult" class="hidden mb-4 p-3 rounded-xl border text-sm"></div>
+
+                        <!-- Google OAuth -->
+                        <div id="googleAuthSection" class="flex items-center justify-between p-4 bg-dark-900/40 rounded-xl border border-white/5">
+                            <div class="flex items-center gap-3">
+                                <div id="googleAuthIcon" class="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center">
+                                    <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+                                </div>
+                                <div>
+                                    <p id="googleStatusText" class="text-sm font-medium text-gray-300">Belum Terhubung</p>
+                                    <p id="googleStatusSub" class="text-xs text-gray-500">Hubungkan untuk publish artikel</p>
+                                </div>
+                            </div>
+                            <button id="googleAuthBtn" onclick="handleGoogleAuth()"
+                                class="px-4 py-2 rounded-lg bg-accent-blue/10 text-accent-blue text-sm font-medium hover:bg-accent-blue/20 transition-all">
+                                Connect
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Divider: Image Generation Settings -->
+                    <div class="border-t border-white/5 pt-5 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-sm font-medium text-gray-300">Gambar Postingan (AI Generator)</h3>
+                                <p class="text-xs text-gray-500">Otomatis buat dan sisipkan gambar di artikel</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="settingImageEnabled" onchange="toggleImageSettings()" class="sr-only peer">
+                                <div class="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-300 after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-purple"></div>
+                            </label>
+                        </div>
+
+                        <!-- Image Settings Fields (toggled by switch) -->
+                        <div id="imageSettingsFields" class="hidden space-y-4 pt-2">
+                            <!-- Image API Base URL -->
+                            <div>
+                                <label for="settingImageBaseUrl" class="block text-sm font-medium text-gray-300 mb-2">Base URL Generator</label>
+                                <input type="text" id="settingImageBaseUrl" placeholder="https://api.premzone.co"
+                                    class="w-full px-4 py-3 bg-dark-900/60 border border-white/10 rounded-xl text-gray-100 placeholder-gray-500 focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all text-sm">
+                            </div>
+
+                            <!-- Image API Model -->
+                            <div>
+                                <label for="settingImageModel" class="block text-sm font-medium text-gray-300 mb-2">Model</label>
+                                <input type="text" id="settingImageModel" placeholder="cx/gpt-5.5"
+                                    class="w-full px-4 py-3 bg-dark-900/60 border border-white/10 rounded-xl text-gray-100 placeholder-gray-500 focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all text-sm">
+                            </div>
+
+                            <!-- Image API Key -->
+                            <div>
+                                <label for="settingImageApiKey" class="block text-sm font-medium text-gray-300 mb-2">API Key</label>
+                                <div class="relative">
+                                    <input type="password" id="settingImageApiKey" placeholder="sk-..."
+                                        class="w-full px-4 py-3 pr-10 bg-dark-900/60 border border-white/10 rounded-xl text-gray-100 placeholder-gray-500 focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all text-sm">
+                                    <button type="button" onclick="togglePasswordVisibility('settingImageApiKey')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Image Prompt Template -->
+                            <div>
+                                <label for="settingImagePrompt" class="block text-sm font-medium text-gray-300 mb-2">Prompt Template</label>
+                                <textarea id="settingImagePrompt" rows="3" placeholder="A flat style vector illustration of [TOPIK], modern design, vibrant colors"
+                                    class="w-full px-4 py-3 bg-dark-900/60 border border-white/10 rounded-xl text-gray-100 placeholder-gray-500 focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all text-sm resize-none"></textarea>
+                                <p class="mt-1 text-[10px] text-gray-500">Gunakan tag <strong>[TOPIK]</strong> sebagai placeholder topik artikel Anda.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- Modal Footer -->
+                <div class="p-6 border-t border-white/5 flex gap-3">
+                    <button onclick="closeSettings()" class="flex-1 py-3 px-4 rounded-xl text-sm font-medium bg-white/5 text-gray-300 hover:bg-white/10 transition-all">Batal</button>
+                    <button onclick="saveSettings()" id="saveSettingsBtn" class="flex-1 py-3 px-4 rounded-xl text-sm font-medium bg-gradient-to-r from-accent-purple to-accent-blue text-white hover:opacity-90 transition-all flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        Simpan
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ DETAIL HISTORY MODAL ═══════════ -->
+    <div id="historyDetailModal" class="fixed inset-0 z-[100] hidden">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeHistoryDetail()"></div>
+        <div class="absolute inset-0 flex items-center justify-center p-4">
+            <div class="glass-card rounded-2xl border border-white/10 w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-modal-in flex flex-col">
+                <!-- Modal Header -->
+                <div class="flex items-center justify-between p-6 border-b border-white/5 flex-shrink-0">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-accent-blue/10 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-accent-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        </div>
+                        <h2 class="text-lg font-semibold">Detail Artikel & Log Proses</h2>
+                    </div>
+                    <button onclick="closeHistoryDetail()" class="p-2 rounded-lg hover:bg-white/10 transition-all">
+                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="p-6 space-y-6 overflow-y-auto flex-grow">
+                    <!-- Ringkasan Info -->
+                    <div class="grid grid-cols-2 gap-4 bg-white/[0.02] p-4 rounded-xl border border-white/5 text-sm">
+                        <div>
+                            <p class="text-gray-500">Topik</p>
+                            <p id="detailTopic" class="font-medium text-gray-200 mt-0.5">-</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-500">Judul Artikel</p>
+                            <p id="detailTitle" class="font-medium text-gray-200 mt-0.5">-</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-500">Status Publikasi</p>
+                            <p id="detailStatus" class="mt-0.5">-</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-500">Tanggal Pembuatan</p>
+                            <p id="detailDate" class="font-medium text-gray-200 mt-0.5">-</p>
+                        </div>
+                    </div>
+
+                    <!-- Error Alert (If Gagal) -->
+                    <div id="detailErrorContainer" class="hidden p-4 bg-accent-red/5 border border-accent-red/20 rounded-xl">
+                        <div class="flex items-center gap-2 text-accent-red font-medium mb-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            Penyebab Kegagalan:
+                        </div>
+                        <p id="detailErrorMessage" class="text-xs text-gray-300 font-mono whitespace-pre-wrap leading-relaxed"></p>
+                    </div>
+
+                    <!-- Timelines / Logs Step-by-Step -->
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
+                            <svg class="w-4 h-4 text-accent-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                            Log Proses Multi-Agent
+                        </h3>
+                        <div id="detailTimeline" class="space-y-4 relative before:absolute before:left-3.5 before:top-2 before:bottom-2 before:w-[2px] before:bg-white/5">
+                            <!-- Steps dynamically inserted here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="p-6 border-t border-white/5 flex gap-3 flex-shrink-0">
+                    <button onclick="closeHistoryDetail()" class="flex-1 py-3 px-4 rounded-xl text-sm font-medium bg-white/5 text-gray-300 hover:bg-white/10 transition-all">Tutup</button>
+                    <a id="detailLinkBtn" href="#" target="_blank" class="hidden flex-1 py-3 px-4 rounded-xl text-sm font-medium bg-gradient-to-r from-accent-purple to-accent-blue text-white hover:opacity-90 transition-all text-center flex items-center justify-center gap-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                        Buka Postingan
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ TOAST NOTIFICATION ═══════════ -->
+    <div id="toastContainer" class="fixed bottom-6 right-6 z-[200] space-y-3"></div>
+
+    <!-- JavaScript -->
+    <script src="/static/js/app.js?v=1.5"></script>
+</body>
+</html>
