@@ -556,6 +556,9 @@ async function loadSettingsData() {
         // Set blog ID
         document.getElementById('settingBlogId').value = data.blog_id || '';
 
+        // Set default status (draft vs live)
+        document.getElementById('settingDefaultStatus').value = data.default_status || 'draft';
+
         // Load image settings
         const imgEnabled = data.image_api_enabled || false;
         document.getElementById('settingImageEnabled').checked = imgEnabled;
@@ -596,8 +599,11 @@ async function saveSettings() {
     const imgApiKey = document.getElementById('settingImageApiKey').value.trim();
     const imgPrompt = document.getElementById('settingImagePrompt').value.trim();
 
+    const defaultStatus = document.getElementById('settingDefaultStatus').value;
+
     const payload = {
         ai_provider: provider,
+        default_status: defaultStatus,
         image_api_enabled: imgEnabled,
         image_base_url: imgBaseUrl,
         image_model: imgModel,

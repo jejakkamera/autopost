@@ -124,16 +124,31 @@ async def process_pending_schedule_queue():
                 html_id = article["html_content"]
                 steps = article.get("steps", [])
 
-                translation = await translate_article_to_english(
-                    provider=ai_provider,
-                    api_key=api_key,
-                    title=title_id,
-                    html_content=html_id,
-                    model=ai_model or None,
-                    custom_base_url=custom_base_url,
-                )
-                title = translation["title"]
-                html_content = translation["html_content"]
+                try:
+                    translation = await translate_article_to_english(
+                        provider=ai_provider,
+                        api_key=api_key,
+                        title=title_id,
+                        html_content=html_id,
+                        model=ai_model or None,
+                        custom_base_url=custom_base_url,
+                    )
+                    title = translation["title"]
+                    html_content = translation["html_content"]
+                    steps.append({
+                        "step": "5. Translator Agent (ID -> EN)",
+                        "prompt": "Translate title and HTML content to English.",
+                        "response": f"Translated title: {title}",
+                        "status": "SUKSES"
+                    })
+                except Exception as trans_err:
+                    steps.append({
+                        "step": "5. Translator Agent (ID -> EN)",
+                        "prompt": "Translate title and HTML content to English.",
+                        "response": f"Error: {str(trans_err)}",
+                        "status": "GAGAL"
+                    })
+                    raise trans_err
 
             # 3. Klasifikasi Tag/Label
             try:
@@ -145,8 +160,20 @@ async def process_pending_schedule_queue():
                     custom_base_url=custom_base_url,
                 )
                 tag_label = tags["tag_id"] if language == "Indonesia" else tags["tag_en"]
-            except Exception:
+                steps.append({
+                    "step": "Classify Tags",
+                    "prompt": f"Classify topic: {topic}",
+                    "response": f"Tags: {json.dumps(tags)}",
+                    "status": "SUKSES"
+                })
+            except Exception as tag_err:
                 tag_label = "Umum" if language == "Indonesia" else "General"
+                steps.append({
+                    "step": "Classify Tags",
+                    "prompt": f"Classify topic: {topic}",
+                    "response": f"Failed, fallback to default. Error: {tag_err}",
+                    "status": "GAGAL"
+                })
 
             labels = [language, tag_label]
 
@@ -160,13 +187,16 @@ async def process_pending_schedule_queue():
                         model=ai_model or None,
                         custom_base_url=custom_base_url,
                     )
-                except Exception:
+                except Exception as vis_err:
+                    print(f"   ⚠️ Scheduler: Failed to generate visual desc: {vis_err}")
                     visual_desc = " ".join(topic.split()[:5])
 
                 img_prompt = image_prompt_template.replace("[TOPIK]", visual_desc)
                 b64_image = None
+                last_img_err = None
                 for attempt in range(1, 4):
                     try:
+                        print(f"   🖼️ Scheduler: Attempt {attempt} to generate image for prompt: '{img_prompt}'")
                         b64_image = await generate_image(
                             api_key=image_api_key,
                             base_url=image_base_url,
@@ -175,21 +205,35 @@ async def process_pending_schedule_queue():
                         )
                         break
                     except Exception as img_err:
+                        last_img_err = img_err
                         print(f"   ⚠️ Scheduler Image Attempt {attempt} failed: {img_err}")
                         if attempt < 3:
                             await asyncio.sleep(1.5)
 
-                if b64_image:
-                    try:
-                        img_url = await upload_to_catbox(b64_image)
-                        image_html = f"""
-                        <div style="text-align: center; margin-bottom: 24px; width: 100%;">
-                            <img src="{img_url}" alt="{title}" style="max-width: 100%; height: auto; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.15);" />
-                        </div>
-                        """
-                        html_content = image_html + html_content
-                    except Exception as up_err:
-                        print(f"   ⚠️ Scheduler Image upload failed: {up_err}")
+                try:
+                    if not b64_image:
+                        raise last_img_err or Exception("Image generation returned empty.")
+                    img_url = await upload_to_catbox(b64_image)
+                    image_html = f"""
+                    <div style="text-align: center; margin-bottom: 24px; width: 100%;">
+                        <img src="{img_url}" alt="{title}" style="max-width: 100%; height: auto; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.15);" />
+                    </div>
+                    """
+                    html_content = image_html + html_content
+                    steps.append({
+                        "step": "4. Image Generator",
+                        "prompt": f"Base URL: {image_base_url}\nModel: {image_model}\nVisual Desc: {visual_desc}\nPrompt: {img_prompt}",
+                        "response": f"Image URL: {img_url}",
+                        "status": "SUKSES"
+                    })
+                except Exception as final_img_err:
+                    print(f"   ⚠️ Scheduler Image generation/upload failed: {final_img_err}")
+                    steps.append({
+                        "step": "4. Image Generator",
+                        "prompt": f"Base URL: {image_base_url}\nModel: {image_model}\nVisual Desc: {visual_desc}\nPrompt: {img_prompt}",
+                        "response": f"Error: {str(final_img_err)}",
+                        "status": "GAGAL"
+                    })
 
             # 5. Publikasikan ke Blogger
             result = await publish_to_blogger(
@@ -199,6 +243,12 @@ async def process_pending_schedule_queue():
                 is_draft=is_draft,
                 labels=labels,
             )
+            steps.append({
+                "step": f"6. Blogger Publisher ({language})",
+                "prompt": f"Publish Mode: {'Draft' if is_draft else 'Live'}\nBlog ID: {blog_id}\nLabels: {', '.join(labels)}",
+                "response": f"Post ID: {result['post_id']}\nURL: {result['article_url']}",
+                "status": "SUKSES"
+            })
 
             # 6. Simpan ke Riwayat (History)
             await add_history(

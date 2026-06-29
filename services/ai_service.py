@@ -160,6 +160,44 @@ def _post_process(raw_html: str, default_title: str, provider_name: str = None, 
         """
         body_html = body_html.rstrip() + watermark
 
+    # Inject CSS for code and pre tags to look premium and distinct
+    code_style = """
+    <style>
+      .post-body pre, .post-body code, pre, code {
+        font-family: 'Fira Code', Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace !important;
+      }
+      pre {
+        background: #1e1e2e !important;
+        color: #cdd6f4 !important;
+        padding: 16px !important;
+        border-radius: 10px !important;
+        border: 1px solid #313244 !important;
+        overflow-x: auto !important;
+        font-size: 13px !important;
+        line-height: 1.6 !important;
+        margin: 20px 0 !important;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.1) !important;
+      }
+      code {
+        background: #313244 !important;
+        color: #f5c2e7 !important;
+        padding: 3px 6px !important;
+        border-radius: 6px !important;
+        font-size: 90% !important;
+        word-break: break-word !important;
+      }
+      pre code {
+        background: transparent !important;
+        color: inherit !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+        font-size: inherit !important;
+        word-break: normal !important;
+      }
+    </style>
+    """
+    body_html = code_style + body_html
+
     return {"title": title, "html_content": body_html, "is_valid": is_valid}
 
 
@@ -338,7 +376,7 @@ async def generate_article(
 
         # ── Langkah 2: Role = Content Writer ──
         system_2 = "Kamu adalah Content Writer."
-        prompt_2 = f"Tulis artikel blog berkualitas tinggi dan terfokus berdasarkan kerangka ini: {outline}. Tulis secara padat dan humanis (hindari basa-basi berlebih). Jangan gunakan HTML dulu, KECUALI jika perlu menyematkan peta lokasi, gunakan penanda khusus format: [MAPS: Nama Lokasi atau Alamat Lengkap]."
+        prompt_2 = f"Tulis artikel blog berkualitas tinggi dan terfokus berdasarkan kerangka ini: {outline}. Tulis secara padat dan humanis (hindari basa-basi berlebih). Jika ada perintah terminal (Linux/shell) atau potongan kode, ketikkan secara terpisah agar mudah dikenali. Jangan gunakan HTML dulu, KECUALI jika perlu menyematkan peta lokasi, gunakan penanda khusus format: [MAPS: Nama Lokasi atau Alamat Lengkap]."
         try:
             raw_article = await _call_llm(provider, api_key, system_2, prompt_2, model, base_url, search_grounding)
             steps.append({
@@ -361,7 +399,7 @@ async def generate_article(
 
         # ── Langkah 3: Role = Web Publisher ──
         system_3 = "Kamu adalah Web Publisher."
-        prompt_3 = f"Ubah artikel berikut menjadi murni HTML. Gunakan tag HTML standar untuk postingan blog seperti <h2>, <h3>, <h4>, <p>, <strong>, <b>, <em>, <i>, <u>, <ul>, <ol>, <li>, <a> (untuk link / tautan rujukan / referral), <img> (gambar), <iframe> (untuk video YouTube atau peta Google Maps), <blockquote> (kutipan), <br> (baris baru), serta <table>, <thead>, <tbody>, <tr>, <th>, <td> (untuk tabel perbandingan/data). JIKA menemukan penanda peta seperti [MAPS: Nama Lokasi], ubahlah penanda tersebut menjadi tag <iframe> Google Maps dengan format: <iframe src=\"https://maps.google.com/maps?q=Nama+Lokasi+Disini&output=embed\" width=\"100%\" height=\"450\" style=\"border:0;\" allowfullscreen=\"\" loading=\"lazy\"></iframe>. JANGAN sertakan markdown ```html, dan jangan sertakan <html>, <head>, atau <body>. Teks: {raw_article}"
+        prompt_3 = f"Ubah artikel berikut menjadi murni HTML. Gunakan tag HTML standar untuk postingan blog seperti <h2>, <h3>, <h4>, <p>, <strong>, <b>, <em>, <i>, <u>, <ul>, <ol>, <li>, <a> (untuk link / tautan rujukan / referral), <img> (gambar), <iframe> (untuk video YouTube atau peta Google Maps), <blockquote> (kutipan), <br> (baris baru), serta <table>, <thead>, <tbody>, <tr>, <th>, <td> (untuk tabel perbandingan/data). JIKA terdapat potongan kode, skrip, atau perintah terminal (seperti perintah shell/Linux), bungkuslah menggunakan tag <pre><code>...</code></pre> untuk blok perintah penuh, atau <code>...</code> untuk kode/perintah inline agar tampilannya berbeda. JIKA menemukan penanda peta seperti [MAPS: Nama Lokasi], ubahlah penanda tersebut menjadi tag <iframe> Google Maps dengan format: <iframe src=\"https://maps.google.com/maps?q=Nama+Lokasi+Disini&output=embed\" width=\"100%\" height=\"450\" style=\"border:0;\" allowfullscreen=\"\" loading=\"lazy\"></iframe>. JANGAN sertakan markdown ```html, dan jangan sertakan <html>, <head>, atau <body>. Teks: {raw_article}"
         try:
             final_html = await _call_llm(provider, api_key, system_3, prompt_3, model, base_url, False)
             steps.append({
