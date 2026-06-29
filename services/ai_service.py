@@ -61,6 +61,32 @@ PROVIDERS = {
         "key_url": "https://ai.sumopod.com",
         "base_url": "https://ai.sumopod.com",
     },
+    "bynara": {
+        "name": "Bynara Router",
+        "models": [
+            {"id": "mimo-v2.5-pro-free", "name": "Mimo v2.5 Pro Free (Reasoning)"},
+            {"id": "mimo-v2.5-free", "name": "Mimo v2.5 Free (Reasoning)"},
+            {"id": "mistral-large", "name": "Mistral Large (Cepat & Akurat)"},
+            {"id": "mistral-medium-3-5", "name": "Mistral Medium 3.5 (Cepat)"},
+        ],
+        "default_model": "mimo-v2.5-pro-free",
+        "key_placeholder": "sk-nry-...",
+        "key_url": "https://router.bynara.id",
+        "base_url": "https://router.bynara.id/v1",
+    },
+    "dahono": {
+        "name": "Dahono Labs",
+        "models": [
+            {"id": "dahono/deepseek-v4-flash", "name": "DeepSeek V4 Flash (Free)"},
+            {"id": "dahono/deepseek-v3.2", "name": "DeepSeek V3.2 (Free)"},
+            {"id": "dahono/ai-chat", "name": "Dahono AI Chat (Free)"},
+            {"id": "dahono/deepseek-v4-pro", "name": "DeepSeek V4 Pro (Paid)"},
+        ],
+        "default_model": "dahono/deepseek-v4-flash",
+        "key_placeholder": "dahono-...",
+        "key_url": "https://labs.dahono.com/gateway/docs",
+        "base_url": "https://gateway.dahono.com/v1",
+    },
     "custom": {
         "name": "Custom (OpenAI Compatible)",
         "models": [],
@@ -75,12 +101,20 @@ PROVIDERS = {
 # Post-Processing
 # ============================================
 def _strip_markdown_wrapper(text: str) -> str:
-    """Hapus ```html ... ``` wrapper jika ada."""
-    text = re.sub(r'^```html\s*\n?', '', text.strip())
-    text = re.sub(r'\n?```\s*$', '', text.strip())
-    text = re.sub(r'^```\s*\n?', '', text.strip())
-    text = re.sub(r'\n?```\s*$', '', text.strip())
-    return text.strip()
+    """Hapus ```html ... ``` wrapper dan teks pengantar/penutup jika ada."""
+    text_clean = text.strip()
+    
+    # Cari pola ```html ... ``` atau ``` ... ``` secara non-greedy
+    match = re.search(r'```(?:html)?\s*(.*?)\s*```', text_clean, re.DOTALL | re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+        
+    # Jika tidak ada block ```, bersihkan wrapper di awal/akhir secara standar
+    text_clean = re.sub(r'^```html\s*\n?', '', text_clean)
+    text_clean = re.sub(r'\n?```\s*$', '', text_clean)
+    text_clean = re.sub(r'^```\s*\n?', '', text_clean)
+    text_clean = re.sub(r'\n?```\s*$', '', text_clean)
+    return text_clean.strip()
 
 
 def _extract_title(html: str, default_title: str) -> str:
@@ -110,12 +144,22 @@ def _validate_html(html: str) -> bool:
     return has_h2 and has_p
 
 
-def _post_process(raw_html: str, default_title: str) -> Dict:
-    """Post-process HTML dari AI: strip wrapper, extract title, remove h1."""
+def _post_process(raw_html: str, default_title: str, provider_name: str = None, model_name: str = None) -> Dict:
+    """Post-process HTML dari AI: strip wrapper, extract title, remove h1, append AI watermark."""
     html = _strip_markdown_wrapper(raw_html)
     title = _extract_title(html, default_title)
     body_html = _remove_h1(html)
     is_valid = _validate_html(body_html)
+
+    # Tambahkan tanda/signature AI pembuat di akhir artikel
+    if provider_name and model_name:
+        watermark = f"""
+        <p style="font-size: 0.85em; color: #7f8c8d; font-style: italic; margin-top: 32px; border-top: 1px solid #e0e0e0; padding-top: 12px;">
+            Artikel ini ditulis oleh kecerdasan buatan (AI) menggunakan model <strong>{model_name}</strong> via <strong>{provider_name}</strong>.
+        </p>
+        """
+        body_html = body_html.rstrip() + watermark
+
     return {"title": title, "html_content": body_html, "is_valid": is_valid}
 
 
@@ -150,7 +194,7 @@ async def _call_gemini(
 async def _call_openai_compatible(
     api_key: str, system_prompt: str, user_prompt: str, model: str, base_url: str
 ) -> str:
-    """Panggil OpenAI-compatible API (OpenAI, DeepSeek, SumoPod, Custom)."""
+    """Panggil OpenAI-compatible API (OpenAI, DeepSeek, SumoPod, Custom) secara streaming untuk menghindari Cloudflare Timeout."""
     base_url = base_url.rstrip("/")
     if base_url.endswith("/v1"):
         url = f"{base_url}/chat/completions"
@@ -173,32 +217,46 @@ async def _call_openai_compatible(
         ],
         "temperature": 0.7,
         "max_tokens": 8192,
+        "stream": True,  # Mengaktifkan streaming
     }
 
+    content_chunks = []
     async with httpx.AsyncClient(timeout=300.0) as client:
-        response = await client.post(url, json=payload, headers=headers)
+        try:
+            async with client.stream("POST", url, json=payload, headers=headers) as response:
+                if response.status_code == 429:
+                    raise Exception("QUOTA_EXCEEDED: Limit API provider tercapai. Coba lagi nanti.")
+                elif response.status_code == 401:
+                    raise Exception("INVALID_KEY: API Key tidak valid. Periksa di menu Pengaturan.")
+                elif response.status_code != 200:
+                    error_body = await response.aread()
+                    error_msg = error_body.decode("utf-8", errors="ignore")[:200]
+                    if error_msg.strip().startswith("<!DOCTYPE") or "cloudflare" in error_msg.lower():
+                        error_msg = "Cloudflare Timeout / Block (Kemungkinan penulisan nama Model salah, server lambat/down, atau limit IP terpicu)"
+                    raise Exception(f"API_ERROR: {error_msg}")
 
-        if response.status_code == 429:
-            raise Exception("QUOTA_EXCEEDED: Limit API provider tercapai. Coba lagi nanti.")
-        elif response.status_code == 401:
-            raise Exception("INVALID_KEY: API Key tidak valid. Periksa di menu Pengaturan.")
-        elif response.status_code != 200:
-            error_msg = response.text[:200]
-            if response.headers.get("content-type", "").startswith("application/json"):
-                try:
-                    error_data = response.json()
-                    error_msg = error_data.get("error", {}).get("message", error_msg)
-                except Exception:
-                    pass
-            
-            # Jika response berupa HTML (Cloudflare block/timeout)
-            if error_msg.strip().startswith("<!DOCTYPE") or "cloudflare" in error_msg.lower():
-                error_msg = "Cloudflare Timeout / Block (Kemungkinan penulisan nama Model salah, server lambat/down, atau limit IP terpicu)"
-                
-            raise Exception(f"API_ERROR: {error_msg}")
+                import json
+                async for line in response.aiter_lines():
+                    if not line.strip():
+                        continue
+                    if line.startswith("data: "):
+                        data_str = line[6:].strip()
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            chunk_data = json.loads(data_str)
+                            choices = chunk_data.get("choices", [])
+                            if choices:
+                                delta = choices[0].get("delta", {})
+                                content = delta.get("content")
+                                if content:
+                                    content_chunks.append(content)
+                        except Exception:
+                            pass
+        except httpx.HTTPError as he:
+            raise Exception(f"HTTP_CONNECTION_ERROR: Gagal terhubung ke API provider ({he})")
 
-        data = response.json()
-        return data["choices"][0]["message"]["content"]
+    return "".join(content_chunks)
 
 
 async def _call_llm(
@@ -213,7 +271,7 @@ async def _call_llm(
     """Router pemanggilan LLM berdasarkan provider yang dipilih dengan dukungan grounding."""
     if provider == "gemini":
         return await _call_gemini(api_key, system_prompt, user_prompt, model, search_grounding)
-    elif provider in ("deepseek", "openai", "sumopod", "custom"):
+    elif provider in ("deepseek", "openai", "sumopod", "bynara", "dahono", "custom"):
         return await _call_openai_compatible(api_key, system_prompt, user_prompt, model, base_url)
     else:
         raise Exception(f"INVALID_PROVIDER: Provider '{provider}' tidak didukung.")
@@ -246,7 +304,7 @@ async def generate_article(
 
     # Set base URL
     base_url = None
-    if provider in ("deepseek", "openai", "sumopod"):
+    if provider in ("deepseek", "openai", "sumopod", "bynara", "dahono"):
         base_url = PROVIDERS[provider]["base_url"]
     elif provider == "custom":
         if not custom_base_url:
@@ -257,7 +315,7 @@ async def generate_article(
     try:
         # ── Langkah 1: Role = SEO Strategist ──
         system_1 = "Kamu adalah SEO Strategist."
-        prompt_1 = f"Buat kerangka artikel H2 dan H3 dari topik {topic}. Jangan beri basa-basi, hanya output daftar."
+        prompt_1 = f"Buat kerangka artikel H2 dan H3 dari topik {topic}. Batasi maksimal 4 tag H2 saja, masing-masing dengan maksimal 2 tag H3. Jangan beri basa-basi, hanya output daftar."
         try:
             outline = await _call_llm(provider, api_key, system_1, prompt_1, model, base_url, search_grounding)
             steps.append({
@@ -280,7 +338,7 @@ async def generate_article(
 
         # ── Langkah 2: Role = Content Writer ──
         system_2 = "Kamu adalah Content Writer."
-        prompt_2 = f"Tulis artikel blog utuh, panjang, dan humanis berdasarkan kerangka ini: {outline}. Jangan gunakan HTML dulu, KECUALI jika perlu menyematkan peta lokasi, gunakan penanda khusus format: [MAPS: Nama Lokasi atau Alamat Lengkap]."
+        prompt_2 = f"Tulis artikel blog berkualitas tinggi dan terfokus berdasarkan kerangka ini: {outline}. Tulis secara padat dan humanis (hindari basa-basi berlebih). Jangan gunakan HTML dulu, KECUALI jika perlu menyematkan peta lokasi, gunakan penanda khusus format: [MAPS: Nama Lokasi atau Alamat Lengkap]."
         try:
             raw_article = await _call_llm(provider, api_key, system_2, prompt_2, model, base_url, search_grounding)
             steps.append({
@@ -322,7 +380,8 @@ async def generate_article(
             raise e3
 
         # Post-processing dan validasi HTML
-        processed = _post_process(final_html, topic)
+        provider_name = PROVIDERS.get(provider, {}).get("name", provider)
+        processed = _post_process(final_html, topic, provider_name, model)
         return {
             "title": processed["title"],
             "html_content": processed["html_content"],
@@ -358,7 +417,7 @@ async def translate_article_to_english(
         model = PROVIDERS[provider]["default_model"]
 
     base_url = None
-    if provider in ("deepseek", "openai", "sumopod"):
+    if provider in ("deepseek", "openai", "sumopod", "bynara", "dahono"):
         base_url = PROVIDERS[provider]["base_url"]
     elif provider == "custom":
         base_url = custom_base_url.rstrip("/")
@@ -388,9 +447,21 @@ Kembalikan hasil terjemahan dalam format JSON murni seperti ini (JANGAN gunakan 
     try:
         import json
         data = json.loads(cleaned)
+        translated_title = data.get("title", title)
+        translated_html = data.get("html_content", html_content)
+        
+        provider_name = PROVIDERS.get(provider, {}).get("name", provider)
+        if provider_name and model:
+            watermark = f"""
+            <p style="font-size: 0.85em; color: #7f8c8d; font-style: italic; margin-top: 32px; border-top: 1px solid #e0e0e0; padding-top: 12px;">
+                This article was translated by Artificial Intelligence (AI) using <strong>{model}</strong> via <strong>{provider_name}</strong>.
+            </p>
+            """
+            translated_html = translated_html.rstrip() + watermark
+            
         return {
-            "title": data.get("title", title),
-            "html_content": data.get("html_content", html_content)
+            "title": translated_title,
+            "html_content": translated_html
         }
     except Exception:
         # Fallback jika parsing gagal
@@ -410,7 +481,7 @@ async def generate_tags(
         model = PROVIDERS[provider]["default_model"]
 
     base_url = None
-    if provider in ("deepseek", "openai", "sumopod"):
+    if provider in ("deepseek", "openai", "sumopod", "bynara", "dahono"):
         base_url = PROVIDERS[provider]["base_url"]
     elif provider == "custom":
         base_url = custom_base_url.rstrip("/")
@@ -459,7 +530,7 @@ async def generate_image_prompt(
         model = PROVIDERS[provider]["default_model"]
 
     base_url = None
-    if provider in ("deepseek", "openai", "sumopod"):
+    if provider in ("deepseek", "openai", "sumopod", "bynara", "dahono"):
         base_url = PROVIDERS[provider]["base_url"]
     elif provider == "custom":
         base_url = custom_base_url.rstrip("/")

@@ -189,6 +189,30 @@ async function loadProviders() {
             deepseek: { name: 'DeepSeek', models: [{ id: 'deepseek-chat', name: 'DeepSeek V4 Pro' }], default_model: 'deepseek-chat', key_placeholder: 'sk-...', key_url: 'https://platform.deepseek.com/api_keys' },
             openai: { name: 'OpenAI', models: [{ id: 'gpt-4o', name: 'GPT-4o' }], default_model: 'gpt-4o', key_placeholder: 'sk-proj-...', key_url: 'https://platform.openai.com/api-keys' },
             sumopod: { name: 'SumoPod AI', models: [{ id: 'gpt-4o-mini', name: 'GPT-4o Mini' }], default_model: 'gpt-4o-mini', key_placeholder: 'sk-...', key_url: 'https://ai.sumopod.com' },
+            bynara: { 
+                name: 'Bynara Router', 
+                models: [
+                    { id: 'mimo-v2.5-pro-free', name: 'Mimo v2.5 Pro Free (Reasoning)' },
+                    { id: 'mimo-v2.5-free', name: 'Mimo v2.5 Free (Reasoning)' },
+                    { id: 'mistral-large', name: 'Mistral Large (Cepat & Akurat)' },
+                    { id: 'mistral-medium-3-5', name: 'Mistral Medium 3.5 (Cepat)' }
+                ], 
+                default_model: 'mimo-v2.5-pro-free', 
+                key_placeholder: 'sk-nry-...', 
+                key_url: 'https://router.bynara.id' 
+            },
+            dahono: {
+                name: 'Dahono Labs',
+                models: [
+                    { id: 'dahono/deepseek-v4-flash', name: 'DeepSeek V4 Flash (Free)' },
+                    { id: 'dahono/deepseek-v3.2', name: 'DeepSeek V3.2 (Free)' },
+                    { id: 'dahono/ai-chat', name: 'Dahono AI Chat (Free)' },
+                    { id: 'dahono/deepseek-v4-pro', name: 'DeepSeek V4 Pro (Paid)' }
+                ],
+                default_model: 'dahono/deepseek-v4-flash',
+                key_placeholder: 'dahono-...',
+                key_url: 'https://labs.dahono.com/gateway/docs'
+            },
             custom: { name: 'Custom (OpenAI Compatible)', models: [], default_model: '', key_placeholder: 'sk-...', key_url: '#' },
         };
     }

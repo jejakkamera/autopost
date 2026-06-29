@@ -24,6 +24,8 @@ async def get_settings():
         deepseek_api_key=mask_api_key(data.get("deepseek_api_key", "")),
         openai_api_key=mask_api_key(data.get("openai_api_key", "")),
         sumopod_api_key=mask_api_key(data.get("sumopod_api_key", "")),
+        bynara_api_key=mask_api_key(data.get("bynara_api_key", "")),
+        dahono_api_key=mask_api_key(data.get("dahono_api_key", "")),
         custom_api_key=mask_api_key(data.get("custom_api_key", "")),
         custom_base_url=data.get("custom_base_url", ""),
         custom_model=data.get("custom_model", ""),
@@ -54,6 +56,8 @@ async def save_settings(request: SettingsRequest):
         "deepseek_api_key": request.deepseek_api_key,
         "openai_api_key": request.openai_api_key,
         "sumopod_api_key": request.sumopod_api_key,
+        "bynara_api_key": request.bynara_api_key,
+        "dahono_api_key": request.dahono_api_key,
         "custom_api_key": request.custom_api_key,
         "custom_base_url": request.custom_base_url,
         "custom_model": request.custom_model,
@@ -118,7 +122,7 @@ async def test_ai_connection(request: AITestRequest):
         model = PROVIDERS[provider]["default_model"]
 
     base_url = None
-    if provider in ("deepseek", "openai", "sumopod"):
+    if provider in ("deepseek", "openai", "sumopod", "bynara", "dahono"):
         base_url = PROVIDERS[provider]["base_url"]
     elif provider == "custom":
         if not custom_base_url:

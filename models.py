@@ -20,6 +20,8 @@ class SettingsRequest(BaseModel):
     deepseek_api_key: Optional[str] = Field(None, description="API Key DeepSeek")
     openai_api_key: Optional[str] = Field(None, description="API Key OpenAI")
     sumopod_api_key: Optional[str] = Field(None, description="API Key SumoPod AI")
+    bynara_api_key: Optional[str] = Field(None, description="API Key Bynara Router")
+    dahono_api_key: Optional[str] = Field(None, description="API Key Dahono Labs")
     custom_api_key: Optional[str] = Field(None, description="API Key Custom Provider")
     custom_base_url: Optional[str] = Field(None, description="Base URL Custom Provider")
     custom_model: Optional[str] = Field(None, description="Model Name Custom Provider")
@@ -41,6 +43,8 @@ class SettingsResponse(BaseModel):
     deepseek_api_key: str = ""
     openai_api_key: str = ""
     sumopod_api_key: str = ""
+    bynara_api_key: str = ""
+    dahono_api_key: str = ""
     custom_api_key: str = ""
     custom_base_url: str = ""
     custom_model: str = ""
