@@ -160,25 +160,129 @@ def _post_process(raw_html: str, default_title: str, provider_name: str = None, 
         """
         body_html = body_html.rstrip() + watermark
 
-    # Inject CSS for code and pre tags to look premium and distinct
-    code_style = """
+    # Inject CSS for the entire article to look premium, neat, and well-justified
+    premium_style = """
     <style>
-      .post-body pre, .post-body code, pre, code {
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+      
+      .ai-post-content {
+        font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+        font-size: 16px !important;
+        line-height: 1.85 !important;
+        color: #2c3e50 !important;
+      }
+      .ai-post-content p {
+        text-align: justify !important;
+        text-justify: inter-word !important;
+        margin-top: 0 !important;
+        margin-bottom: 20px !important;
+        font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+        font-size: 16px !important;
+        line-height: 1.85 !important;
+        color: #2c3e50 !important;
+      }
+      .ai-post-content h2, .ai-post-content h3, .ai-post-content h4 {
+        font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+        color: #1a252f !important;
+        font-weight: 700 !important;
+        line-height: 1.3 !important;
+        margin-bottom: 16px !important;
+      }
+      .ai-post-content h2 {
+        font-size: 1.6rem !important;
+        margin-top: 40px !important;
+        border-bottom: 2px solid #f1f2f6 !important;
+        padding-bottom: 8px !important;
+      }
+      .ai-post-content h3 {
+        font-size: 1.3rem !important;
+        margin-top: 32px !important;
+      }
+      .ai-post-content h4 {
+        font-size: 1.1rem !important;
+        margin-top: 24px !important;
+      }
+      .ai-post-content ul, .ai-post-content ol {
+        margin-top: 0 !important;
+        margin-bottom: 24px !important;
+        padding-left: 24px !important;
+      }
+      .ai-post-content li {
+        text-align: justify !important;
+        text-justify: inter-word !important;
+        margin-bottom: 8px !important;
+        font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+        font-size: 16px !important;
+        line-height: 1.85 !important;
+        color: #2c3e50 !important;
+      }
+      .ai-post-content strong, .ai-post-content b {
+        font-weight: 700 !important;
+        color: #111827 !important;
+      }
+      .ai-post-content a {
+        color: #3b82f6 !important;
+        text-decoration: underline !important;
+        font-weight: 500 !important;
+      }
+      .ai-post-content a:hover {
+        color: #1d4ed8 !important;
+      }
+      .ai-post-content img {
+        max-width: 100% !important;
+        height: auto !important;
+        border-radius: 12px !important;
+        margin: 24px auto !important;
+        display: block !important;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15) !important;
+      }
+      .ai-post-content blockquote {
+        border-left: 4px solid #3b82f6 !important;
+        background-color: #f8fafc !important;
+        padding: 16px 20px !important;
+        margin: 24px 0 !important;
+        font-style: italic !important;
+        color: #475569 !important;
+        border-radius: 0 8px 8px 0 !important;
+      }
+      .ai-post-content blockquote p {
+        margin-bottom: 0 !important;
+        font-style: italic !important;
+      }
+      .ai-post-content table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        margin: 24px 0 !important;
+      }
+      .ai-post-content th, .ai-post-content td {
+        padding: 12px 16px !important;
+        border: 1px solid #e2e8f0 !important;
+        text-align: left !important;
+      }
+      .ai-post-content th {
+        background-color: #f1f5f9 !important;
+        font-weight: 600 !important;
+        color: #0f172a !important;
+      }
+      .ai-post-content tr:nth-child(even) {
+        background-color: #f8fafc !important;
+      }
+      .ai-post-content pre, .ai-post-content code {
         font-family: 'Fira Code', Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace !important;
       }
-      pre {
+      .ai-post-content pre {
         background: #1e1e2e !important;
         color: #cdd6f4 !important;
         padding: 16px !important;
         border-radius: 10px !important;
         border: 1px solid #313244 !important;
         overflow-x: auto !important;
-        font-size: 13px !important;
+        font-size: 14px !important;
         line-height: 1.6 !important;
-        margin: 20px 0 !important;
+        margin: 24px 0 !important;
         box-shadow: inset 0 2px 4px rgba(0,0,0,0.1) !important;
       }
-      code {
+      .ai-post-content code {
         background: #313244 !important;
         color: #f5c2e7 !important;
         padding: 3px 6px !important;
@@ -186,7 +290,7 @@ def _post_process(raw_html: str, default_title: str, provider_name: str = None, 
         font-size: 90% !important;
         word-break: break-word !important;
       }
-      pre code {
+      .ai-post-content pre code {
         background: transparent !important;
         color: inherit !important;
         padding: 0 !important;
@@ -196,7 +300,8 @@ def _post_process(raw_html: str, default_title: str, provider_name: str = None, 
       }
     </style>
     """
-    body_html = code_style + body_html
+    body_html = f'<div class="ai-post-content">{body_html}</div>'
+    body_html = premium_style + body_html
 
     return {"title": title, "html_content": body_html, "is_valid": is_valid}
 
