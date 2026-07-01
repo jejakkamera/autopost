@@ -16,7 +16,8 @@ from services.ai_service import (
     generate_tags, generate_image_prompt, PROVIDERS
 )
 from services.blogger_service import publish_to_blogger
-from services.image_service import generate_image, upload_to_catbox
+from services.image_service import generate_image, upload_image
+from services.webhook_service import send_make_webhook
 
 # Timezone WIB (UTC+7)
 WIB = timezone(timedelta(hours=7))
@@ -80,6 +81,12 @@ async def process_pending_schedule_queue():
     image_base_url = await get_setting("image_base_url") or "https://api.premzone.co"
     image_model = await get_setting("image_model") or "cx/gpt-5.5"
     image_prompt_template = await get_setting("image_prompt_template") or "A flat style vector illustration of [TOPIK], modern design, vibrant colors, clean background"
+    image_uploader = await get_setting("image_uploader") or "catbox"
+    imgbb_api_key = await get_setting("imgbb_api_key") or ""
+
+    # Webhook settings
+    webhook_enabled = (await get_setting("webhook_enabled") or "false").lower() == "true"
+    webhook_url = await get_setting("webhook_url") or ""
 
     is_draft = (await get_setting("default_status") or "draft").lower() == "draft"
 
@@ -88,6 +95,10 @@ async def process_pending_schedule_queue():
         topic = item["topic"]
         language = item["language"]
         search_grounding = item["search_grounding"]
+        
+        # Ambil publish_mode dari antrean, fallback ke default settings
+        item_publish_mode = item.get("publish_mode") or (await get_setting("default_status") or "draft")
+        item_is_draft = item_publish_mode.lower() == "draft"
 
         print(f"🚀 Scheduler: Mulai memproses ID #{item_id} | Bahasa: {language} | Topik: \"{topic}\"")
         await update_schedule_item(item_id, status="GENERATING")
@@ -213,7 +224,27 @@ async def process_pending_schedule_queue():
                 try:
                     if not b64_image:
                         raise last_img_err or Exception("Image generation returned empty.")
-                    img_url = await upload_to_catbox(b64_image)
+                    
+                    img_url = None
+                    last_upload_err = None
+                    for upload_attempt in range(1, 4):
+                        try:
+                            print(f"   ☁️ Scheduler: Attempt {upload_attempt} to upload image via {image_uploader}...")
+                            img_url = await upload_image(
+                                b64_image=b64_image,
+                                uploader=image_uploader,
+                                imgbb_api_key=imgbb_api_key
+                            )
+                            break
+                        except Exception as upload_err:
+                            last_upload_err = upload_err
+                            print(f"   ⚠️ Scheduler Upload Attempt {upload_attempt} failed: {upload_err}")
+                            if upload_attempt < 3:
+                                await asyncio.sleep(1.5)
+
+                    if not img_url:
+                        raise last_upload_err or Exception("Image upload failed after 3 attempts.")
+
                     image_html = f"""
                     <div style="text-align: center; margin-bottom: 24px; width: 100%;">
                         <img src="{img_url}" alt="{title}" style="max-width: 100%; height: auto; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.15);" />
@@ -222,7 +253,7 @@ async def process_pending_schedule_queue():
                     html_content = image_html + html_content
                     steps.append({
                         "step": "4. Image Generator",
-                        "prompt": f"Base URL: {image_base_url}\nModel: {image_model}\nVisual Desc: {visual_desc}\nPrompt: {img_prompt}",
+                        "prompt": f"Base URL: {image_base_url}\nModel: {image_model}\nVisual Desc: {visual_desc}\nPrompt: {img_prompt}\nUploader: {image_uploader}",
                         "response": f"Image URL: {img_url}",
                         "status": "SUKSES"
                     })
@@ -230,7 +261,7 @@ async def process_pending_schedule_queue():
                     print(f"   ⚠️ Scheduler Image generation/upload failed: {final_img_err}")
                     steps.append({
                         "step": "4. Image Generator",
-                        "prompt": f"Base URL: {image_base_url}\nModel: {image_model}\nVisual Desc: {visual_desc}\nPrompt: {img_prompt}",
+                        "prompt": f"Base URL: {image_base_url}\nModel: {image_model}\nVisual Desc: {visual_desc}\nPrompt: {img_prompt}\nUploader: {image_uploader}",
                         "response": f"Error: {str(final_img_err)}",
                         "status": "GAGAL"
                     })
@@ -240,12 +271,12 @@ async def process_pending_schedule_queue():
                 blog_id=blog_id,
                 title=title,
                 html_content=html_content,
-                is_draft=is_draft,
+                is_draft=item_is_draft,
                 labels=labels,
             )
             steps.append({
                 "step": f"6. Blogger Publisher ({language})",
-                "prompt": f"Publish Mode: {'Draft' if is_draft else 'Live'}\nBlog ID: {blog_id}\nLabels: {', '.join(labels)}",
+                "prompt": f"Publish Mode: {'Draft' if item_is_draft else 'Live'}\nBlog ID: {blog_id}\nLabels: {', '.join(labels)}",
                 "response": f"Post ID: {result['post_id']}\nURL: {result['article_url']}",
                 "status": "SUKSES"
             })
@@ -257,7 +288,7 @@ async def process_pending_schedule_queue():
                 status="SUKSES",
                 post_id=result["post_id"],
                 article_url=result["article_url"],
-                publish_mode="draft" if is_draft else "live",
+                publish_mode="draft" if item_is_draft else "live",
                 generation_log=json.dumps(steps) if steps else None,
             )
 
@@ -271,6 +302,21 @@ async def process_pending_schedule_queue():
             )
             print(f"   ✅ Scheduler: ID #{item_id} sukses dipublikasikan!")
 
+            # 8. Webhook: Kirim ke Make.com
+            if webhook_enabled and webhook_url:
+                try:
+                    wh_result = await send_make_webhook(
+                        webhook_url=webhook_url,
+                        title=title,
+                        article_url=result["article_url"],
+                        topic=topic,
+                        labels=labels,
+                        language=language,
+                    )
+                    print(f"   📤 Scheduler Webhook: {wh_result['message']}")
+                except Exception as wh_err:
+                    print(f"   ⚠️ Scheduler Webhook error (non-blocking): {wh_err}")
+
         except Exception as e:
             error_msg = str(e)
             print(f"   ❌ Scheduler: ID #{item_id} gagal: {error_msg}")
@@ -280,7 +326,7 @@ async def process_pending_schedule_queue():
                 topic=topic + (" (English)" if language == "English" else ""),
                 title=title or "Gagal Terjadwal",
                 status="GAGAL",
-                publish_mode="draft" if is_draft else "live",
+                publish_mode="draft" if item_is_draft else "live",
                 error_message=error_msg,
                 generation_log=json.dumps(steps) if steps else None,
             )

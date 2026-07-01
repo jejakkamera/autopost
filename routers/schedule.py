@@ -87,6 +87,7 @@ async def schedule_batch(request: ScheduleBatchRequest):
             scheduled_at=iso_id,
             language="Indonesia",
             search_grounding=request.search_grounding,
+            publish_mode=request.status or "draft",
         )
         schedule_results.append(ScheduleItemResult(
             topic=topic,
@@ -104,6 +105,7 @@ async def schedule_batch(request: ScheduleBatchRequest):
                 scheduled_at=iso_en,
                 language="English",
                 search_grounding=request.search_grounding,
+                publish_mode=request.status or "draft",
             )
             schedule_results.append(ScheduleItemResult(
                 topic=topic,

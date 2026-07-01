@@ -260,14 +260,15 @@ async def add_to_schedule_queue(
     scheduled_at: str,
     language: str,
     search_grounding: bool = False,
+    publish_mode: str = "draft",
 ) -> int:
     """Menambahkan item penjadwalan baru ke antrean."""
     db = await get_db()
     try:
         cursor = await db.execute("""
-            INSERT INTO scheduler_queue (topic, scheduled_at, language, search_grounding, status)
-            VALUES (?, ?, ?, ?, 'PENDING')
-        """, (topic, scheduled_at, language, 1 if search_grounding else 0))
+            INSERT INTO scheduler_queue (topic, scheduled_at, language, search_grounding, status, publish_mode)
+            VALUES (?, ?, ?, ?, 'PENDING', ?)
+        """, (topic, scheduled_at, language, 1 if search_grounding else 0, publish_mode))
         await db.commit()
         return cursor.lastrowid
     finally:
@@ -284,7 +285,7 @@ async def get_pending_schedule_items() -> List[Dict]:
         # Format ISO 8601: YYYY-MM-DDTHH:MM:SS+HH:MM.
         # Tarik semua PENDING dulu agar aman dengan manipulasi datetime di Python.
         cursor = await db.execute("""
-            SELECT id, topic, scheduled_at, language, search_grounding, status
+            SELECT id, topic, scheduled_at, language, search_grounding, status, publish_mode
             FROM scheduler_queue
             WHERE status = 'PENDING'
             ORDER BY scheduled_at ASC
@@ -298,6 +299,7 @@ async def get_pending_schedule_items() -> List[Dict]:
                 "language": row[3],
                 "search_grounding": bool(row[4]),
                 "status": row[5],
+                "publish_mode": row[6] or "draft",
             }
             for row in rows
         ]
@@ -331,7 +333,7 @@ async def get_all_schedule_queue() -> List[Dict]:
     db = await get_db()
     try:
         cursor = await db.execute("""
-            SELECT id, topic, scheduled_at, language, search_grounding, status, title, post_id, article_url, error_message, created_at
+            SELECT id, topic, scheduled_at, language, search_grounding, status, title, post_id, article_url, error_message, created_at, publish_mode
             FROM scheduler_queue
             ORDER BY scheduled_at ASC
         """)
@@ -349,6 +351,7 @@ async def get_all_schedule_queue() -> List[Dict]:
                 "article_url": row[8],
                 "error_message": row[9],
                 "created_at": row[10],
+                "publish_mode": row[11] or "draft",
             }
             for row in rows
         ]

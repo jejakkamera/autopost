@@ -10,7 +10,8 @@ from models import GenerateRequest, GenerateResponse
 from services.db_service import get_setting, add_history, update_history
 from services.ai_service import generate_article, translate_article_to_english, generate_tags, generate_image_prompt, PROVIDERS
 from services.blogger_service import publish_to_blogger, check_auth_status
-from services.image_service import generate_image, upload_to_catbox
+from services.image_service import generate_image, upload_image
+from services.webhook_service import send_make_webhook
 
 router = APIRouter()
 
@@ -62,6 +63,8 @@ async def generate_and_publish(request: GenerateRequest):
     image_base_url = await get_setting("image_base_url") or "https://api.premzone.co"
     image_model = await get_setting("image_model") or "cx/gpt-5.5"
     image_prompt_template = await get_setting("image_prompt_template") or "A flat style vector illustration of [TOPIK], modern design, vibrant colors, clean background"
+    image_uploader = await get_setting("image_uploader") or "catbox"
+    imgbb_api_key = await get_setting("imgbb_api_key") or ""
 
     if image_api_enabled and not image_api_key:
         raise HTTPException(
@@ -192,8 +195,26 @@ async def generate_and_publish(request: GenerateRequest):
                 if not b64_image:
                     raise last_img_err or Exception("Image generation returned empty.")
 
-                # Upload ke cloud (Catbox) untuk mendapatkan link publik permanen
-                img_url = await upload_to_catbox(b64_image)
+                img_url = None
+                last_upload_err = None
+                for upload_attempt in range(1, 4):
+                    try:
+                        print(f"☁️ Attempt {upload_attempt} to upload image via {image_uploader}...")
+                        img_url = await upload_image(
+                            b64_image=b64_image,
+                            uploader=image_uploader,
+                            imgbb_api_key=imgbb_api_key
+                        )
+                        break
+                    except Exception as upload_err:
+                        last_upload_err = upload_err
+                        print(f"⚠️ Upload Attempt {upload_attempt} failed: {upload_err}")
+                        if upload_attempt < 3:
+                            import asyncio
+                            await asyncio.sleep(1.5)
+
+                if not img_url:
+                    raise last_upload_err or Exception("Image upload failed after 3 attempts.")
                 
                 # Prepend img tag ke html_content menggunakan link publik
                 image_html = f"""
@@ -205,15 +226,15 @@ async def generate_and_publish(request: GenerateRequest):
                 
                 steps.append({
                     "step": "4. Image Generator",
-                    "prompt": f"Base URL: {image_base_url}\nModel: {image_model}\nVisual Desc: {visual_desc}\nPrompt: {prompt}",
+                    "prompt": f"Base URL: {image_base_url}\nModel: {image_model}\nVisual Desc: {visual_desc}\nPrompt: {prompt}\nUploader: {image_uploader}",
                     "response": f"Image URL: {img_url}",
                     "status": "SUKSES"
                 })
             except Exception as final_img_err:
-                print(f"⚠️ Image generation/upload failed after {max_attempts} attempts: {final_img_err}")
+                print(f"⚠️ Image generation/upload failed: {final_img_err}")
                 steps.append({
                     "step": "4. Image Generator",
-                    "prompt": f"Base URL: {image_base_url}\nModel: {image_model}\nVisual Desc: {visual_desc}\nPrompt: {prompt}",
+                    "prompt": f"Base URL: {image_base_url}\nModel: {image_model}\nVisual Desc: {visual_desc}\nPrompt: {prompt}\nUploader: {image_uploader}",
                     "response": f"Error: {str(final_img_err)}",
                     "status": "GAGAL"
                 })
@@ -288,6 +309,34 @@ async def generate_and_publish(request: GenerateRequest):
             generation_log=json.dumps(steps),
         )
 
+        # ── Webhook: Kirim ke Make.com (Indonesia) ──
+        webhook_enabled = (await get_setting("webhook_enabled") or "false").lower() == "true"
+        webhook_url = await get_setting("webhook_url") or ""
+        if webhook_enabled and webhook_url:
+            try:
+                wh_result = await send_make_webhook(
+                    webhook_url=webhook_url,
+                    title=title,
+                    article_url=result_id["article_url"],
+                    topic=topic,
+                    labels=["Indonesia", tags["tag_id"]],
+                    language="Indonesia",
+                )
+                steps.append({
+                    "step": "7. Webhook Make.com (Indonesia)",
+                    "prompt": f"URL: {webhook_url[:40]}...",
+                    "response": wh_result["message"],
+                    "status": "SUKSES" if wh_result["success"] else "GAGAL"
+                })
+            except Exception as wh_err:
+                print(f"⚠️ Webhook error (non-blocking): {wh_err}")
+                steps.append({
+                    "step": "7. Webhook Make.com (Indonesia)",
+                    "prompt": f"URL: {webhook_url[:40]}...",
+                    "response": f"Error: {str(wh_err)}",
+                    "status": "GAGAL"
+                })
+
         # ── Step 6: Publish Inggris ke Blogger (jika dual bahasa aktif) ──
         if request.dual_language:
             try:
@@ -329,6 +378,26 @@ async def generate_and_publish(request: GenerateRequest):
                 article_url=result_en["article_url"],
                 generation_log=json.dumps(steps_en),
             )
+
+            # ── Webhook: Kirim ke Make.com (English) ──
+            if webhook_enabled and webhook_url:
+                try:
+                    wh_result_en = await send_make_webhook(
+                        webhook_url=webhook_url,
+                        title=title_en,
+                        article_url=result_en["article_url"],
+                        topic=topic,
+                        labels=["English", tags["tag_en"]],
+                        language="English",
+                    )
+                    steps_en.append({
+                        "step": "7. Webhook Make.com (English)",
+                        "prompt": f"URL: {webhook_url[:40]}...",
+                        "response": wh_result_en["message"],
+                        "status": "SUKSES" if wh_result_en["success"] else "GAGAL"
+                    })
+                except Exception as wh_err_en:
+                    print(f"⚠️ Webhook EN error (non-blocking): {wh_err_en}")
 
         return GenerateResponse(
             status="success",

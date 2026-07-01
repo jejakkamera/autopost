@@ -577,6 +577,25 @@ async function loadSettingsData() {
             if (maskedImgKey) imgKeyField.placeholder = maskedImgKey;
         }
 
+        // Load image uploader
+        document.getElementById('settingImageUploader').value = data.image_uploader || 'catbox';
+        toggleImgbbKeyVisibility();
+
+        const imgbbKeyField = document.getElementById('settingImgbbApiKey');
+        const maskedImgbbKey = data.imgbb_api_key || '';
+        if (maskedImgbbKey && !maskedImgbbKey.startsWith('*')) {
+            imgbbKeyField.value = maskedImgbbKey;
+        } else {
+            imgbbKeyField.value = '';
+            if (maskedImgbbKey) imgbbKeyField.placeholder = maskedImgbbKey;
+        }
+
+        // Load webhook settings
+        const webhookEnabled = data.webhook_enabled || false;
+        document.getElementById('settingWebhookEnabled').checked = webhookEnabled;
+        toggleWebhookSettings();
+        document.getElementById('settingWebhookUrl').value = data.webhook_url || '';
+
         // Update provider label di generate card
         const info = providersData[provider];
         if (info) {
@@ -598,6 +617,11 @@ async function saveSettings() {
     const imgModel = document.getElementById('settingImageModel').value.trim();
     const imgApiKey = document.getElementById('settingImageApiKey').value.trim();
     const imgPrompt = document.getElementById('settingImagePrompt').value.trim();
+    const imageUploader = document.getElementById('settingImageUploader').value;
+    const imgbbApiKey = document.getElementById('settingImgbbApiKey').value.trim();
+
+    const webhookEnabled = document.getElementById('settingWebhookEnabled').checked;
+    const webhookUrl = document.getElementById('settingWebhookUrl').value.trim();
 
     const defaultStatus = document.getElementById('settingDefaultStatus').value;
 
@@ -608,6 +632,8 @@ async function saveSettings() {
         image_base_url: imgBaseUrl,
         image_model: imgModel,
         image_prompt_template: imgPrompt,
+        image_uploader: imageUploader,
+        webhook_enabled: webhookEnabled,
     };
 
     if (provider === 'custom') {
@@ -625,6 +651,12 @@ async function saveSettings() {
     }
     if (imgApiKey) {
         payload.image_api_key = imgApiKey;
+    }
+    if (imgbbApiKey) {
+        payload.imgbb_api_key = imgbbApiKey;
+    }
+    if (webhookUrl) {
+        payload.webhook_url = webhookUrl;
     }
     if (blogId) {
         payload.blog_id = blogId;
@@ -669,6 +701,68 @@ function toggleImageSettings() {
     } else {
         fields.classList.add('hidden');
     }
+}
+ 
+function toggleImgbbKeyVisibility() {
+    const uploader = document.getElementById('settingImageUploader').value;
+    const container = document.getElementById('imgbbApiKeyContainer');
+    if (uploader === 'imgbb') {
+        container.classList.remove('hidden');
+    } else {
+        container.classList.add('hidden');
+    }
+}
+
+function toggleWebhookSettings() {
+    const enabled = document.getElementById('settingWebhookEnabled').checked;
+    const fields = document.getElementById('webhookSettingsFields');
+    if (enabled) {
+        fields.classList.remove('hidden');
+    } else {
+        fields.classList.add('hidden');
+    }
+}
+
+async function testWebhook() {
+    const url = document.getElementById('settingWebhookUrl').value.trim();
+    if (!url) {
+        showToast('Masukkan Webhook URL terlebih dahulu.', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('testWebhookBtn');
+    const resultEl = document.getElementById('webhookTestResult');
+    btn.disabled = true;
+    btn.innerHTML = `<svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25"/><path fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" class="opacity-75"/></svg> Menguji...`;
+    resultEl.classList.add('hidden');
+
+    try {
+        const response = await fetch('/api/settings/test-webhook', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ webhook_url: url }),
+        });
+        const data = await response.json();
+
+        resultEl.classList.remove('hidden');
+        if (data.status === 'success') {
+            resultEl.className = 'mt-2 text-xs text-center text-green-400';
+            resultEl.textContent = '✅ ' + data.message;
+            showToast('Webhook berhasil! ✅', 'success');
+        } else {
+            resultEl.className = 'mt-2 text-xs text-center text-red-400';
+            resultEl.textContent = '❌ ' + data.message;
+            showToast('Webhook gagal: ' + data.message, 'error');
+        }
+    } catch (error) {
+        resultEl.classList.remove('hidden');
+        resultEl.className = 'mt-2 text-xs text-center text-red-400';
+        resultEl.textContent = '❌ Gagal mengirim request.';
+        showToast('Gagal menguji webhook.', 'error');
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Test Webhook`;
 }
 
 
@@ -1238,6 +1332,7 @@ function previewSchedule() {
     const interval = parseInt(document.getElementById('scheduleInterval').value) || 2;
     const topics = getTopicsFromInputs();
     const dualLanguage = document.getElementById('scheduleDualLanguage').checked;
+    const mode = document.getElementById('scheduleModeSelect').value;
 
     if (topics.length === 0) {
         showToast('⚠️ Masukkan minimal satu topik.', 'warning');
@@ -1252,6 +1347,10 @@ function previewSchedule() {
     tbody.innerHTML = '';
     let counter = 1;
 
+    const modeBadge = mode === 'live'
+        ? '<span class="px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 text-xs font-semibold">🚀 Live</span>'
+        : '<span class="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 text-xs font-semibold">📝 Draft</span>';
+
     topics.forEach((topic, idx) => {
         const releaseDate = new Date(startDate);
         releaseDate.setDate(releaseDate.getDate() + idx * interval);
@@ -1264,6 +1363,7 @@ function previewSchedule() {
                 <td class="px-5 py-3 text-gray-200">${escapeHtml(topic)}</td>
                 <td class="px-5 py-3"><span class="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 text-xs font-medium">🇮🇩 Indonesia</span></td>
                 <td class="px-5 py-3 text-gray-400">${dateStr}, 09:00 WIB</td>
+                <td class="px-5 py-3">${modeBadge}</td>
             </tr>
         `;
         
@@ -1275,6 +1375,7 @@ function previewSchedule() {
                     <td class="px-5 py-3 text-gray-200">${escapeHtml(topic)}</td>
                     <td class="px-5 py-3"><span class="px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 text-xs font-medium">🇬🇧 English</span></td>
                     <td class="px-5 py-3 text-gray-400">${dateStr}, 15:00 WIB</td>
+                    <td class="px-5 py-3">${modeBadge}</td>
                 </tr>
             `;
         }
@@ -1297,6 +1398,7 @@ async function runScheduleBatch() {
     const topics = getTopicsFromInputs();
     const searchGrounding = document.getElementById('scheduleSearchGrounding').checked;
     const dualLanguage = document.getElementById('scheduleDualLanguage').checked;
+    const status = document.getElementById('scheduleModeSelect').value;
 
     if (!topics.length || !startDate) {
         showToast('⚠️ Lengkapi topik dan tanggal mulai.', 'warning');
@@ -1326,6 +1428,7 @@ async function runScheduleBatch() {
                 interval_days: interval,
                 search_grounding: searchGrounding,
                 dual_language: dualLanguage,
+                status: status,
             }),
         });
 
@@ -1428,6 +1531,9 @@ async function loadScheduleQueue() {
                 }
 
                 const errorTooltip = item.error_message ? ` title="${escapeHtml(item.error_message)}"` : '';
+                const modeBadge = item.publish_mode === 'live'
+                    ? '<span class="px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 text-xs font-semibold ml-1">🚀 Live</span>'
+                    : '<span class="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 text-xs font-semibold ml-1">📝 Draft</span>';
 
                 tbody.innerHTML += `
                     <tr class="hover:bg-white/5 transition-colors">
@@ -1435,7 +1541,12 @@ async function loadScheduleQueue() {
                         <td class="px-5 py-3 text-gray-200 max-w-[180px] truncate" title="${escapeHtml(item.topic)}">${escapeHtml(item.topic)}</td>
                         <td class="px-5 py-3"><span class="px-2 py-0.5 rounded-md ${langClass} text-xs font-medium">${langFlag} ${item.language}</span></td>
                         <td class="px-5 py-3 text-gray-400 text-xs">${scheduledDisplay} WIB</td>
-                        <td class="px-5 py-3"><span class="px-2 py-0.5 rounded-md ${statusClass} text-xs font-semibold cursor-default"${errorTooltip}>${item.status}</span></td>
+                        <td class="px-5 py-3">
+                            <div class="flex items-center gap-1">
+                                <span class="px-2 py-0.5 rounded-md ${statusClass} text-xs font-semibold cursor-default"${errorTooltip}>${item.status}</span>
+                                ${modeBadge}
+                            </div>
+                        </td>
                         <td class="px-5 py-3">${actionBtn}</td>
                     </tr>
                 `;

@@ -89,14 +89,58 @@ async def upload_to_catbox(b64_image: str) -> str:
         data = {
             "reqtype": "fileupload"
         }
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        }
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(url, data=data, files=files)
+        async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+            response = await client.post(url, data=data, files=files, headers=headers)
+            response_text = response.text.strip()
             if response.status_code == 200:
-                img_url = response.text.strip()
-                if img_url.startswith("https://files.catbox.moe/"):
-                    return img_url
-            raise Exception(f"Catbox upload failed: {response.text}")
+                if response_text.startswith("https://files.catbox.moe/"):
+                    return response_text
+            
+            if "Invalid uploader" in response_text:
+                raise Exception(
+                    "Catbox memblokir IP server Anda (Invalid uploader). "
+                    "Ini sering terjadi pada server VPS/hosting. Silakan masuk ke Pengaturan, "
+                    "ubah 'Penyedia Upload Gambar' ke 'ImgBB', dan masukkan API Key ImgBB gratis Anda."
+                )
+            raise Exception(f"Catbox upload failed: {response_text}")
     except Exception as e:
+        if "Catbox memblokir IP server Anda" in str(e):
+            raise Exception(f"IMAGE_UPLOAD_ERROR: {str(e)}")
         raise Exception(f"IMAGE_UPLOAD_ERROR: Gagal mengunggah gambar ke cloud — {str(e)}")
+
+
+async def upload_to_imgbb(b64_image: str, api_key: str) -> str:
+    """Upload base64 image to ImgBB and return the public URL."""
+    if not api_key:
+        raise Exception("API Key ImgBB belum dikonfigurasi. Silakan isi di Pengaturan.")
+    try:
+        url = "https://api.imgbb.com/1/upload"
+        data = {
+            "key": api_key,
+            "image": b64_image
+        }
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        }
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(url, data=data, headers=headers)
+            if response.status_code == 200:
+                resp_json = response.json()
+                if resp_json.get("success") and "data" in resp_json:
+                    return resp_json["data"]["url"]
+            raise Exception(f"ImgBB upload failed: {response.text}")
+    except Exception as e:
+        raise Exception(f"IMAGE_UPLOAD_ERROR: Gagal mengunggah gambar ke ImgBB — {str(e)}")
+
+
+async def upload_image(b64_image: str, uploader: str = "catbox", imgbb_api_key: str = "") -> str:
+    """Upload base64 image using the specified uploader ('catbox' or 'imgbb')."""
+    if uploader.lower() == "imgbb":
+        return await upload_to_imgbb(b64_image, imgbb_api_key)
+    else:
+        return await upload_to_catbox(b64_image)
 

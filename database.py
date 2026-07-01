@@ -78,9 +78,16 @@ async def init_db():
                 post_id TEXT,
                 article_url TEXT,
                 error_message TEXT,
+                publish_mode TEXT DEFAULT 'draft',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+
+        # Safe migration: tambahkan kolom publish_mode ke scheduler_queue jika belum ada
+        try:
+            await db.execute("ALTER TABLE scheduler_queue ADD COLUMN publish_mode TEXT DEFAULT 'draft'")
+        except Exception:
+            pass  # Kolom sudah ada
 
         await db.commit()
         print("✅ Database initialized successfully.")

@@ -2,6 +2,7 @@ from fastapi import APIRouter
 from models import SettingsRequest, SettingsResponse, MessageResponse, AITestRequest, AITestResponse
 from services.db_service import get_all_settings, save_multiple_settings, get_setting
 from services.ai_service import get_providers_info, _call_llm, PROVIDERS
+from services.webhook_service import test_make_webhook
 
 router = APIRouter()
 
@@ -40,6 +41,11 @@ async def get_settings():
             "image_prompt_template",
             "A flat style vector illustration of [TOPIK], modern design, vibrant colors, clean background"
         ),
+        image_uploader=data.get("image_uploader", "catbox"),
+        imgbb_api_key=mask_api_key(data.get("imgbb_api_key", "")),
+        # Webhook Settings
+        webhook_enabled=data.get("webhook_enabled", "false").lower() == "true",
+        webhook_url=data.get("webhook_url", ""),
     )
 
 
@@ -68,10 +74,17 @@ async def save_settings(request: SettingsRequest):
         "image_base_url": request.image_base_url,
         "image_model": request.image_model,
         "image_prompt_template": request.image_prompt_template,
+        "image_uploader": request.image_uploader,
+        "imgbb_api_key": request.imgbb_api_key,
+        # Webhook Settings
+        "webhook_url": request.webhook_url,
     }
 
     if request.image_api_enabled is not None:
         fields["image_api_enabled"] = "true" if request.image_api_enabled else "false"
+
+    if request.webhook_enabled is not None:
+        fields["webhook_enabled"] = "true" if request.webhook_enabled else "false"
 
     for key, value in fields.items():
         if value is not None:
@@ -154,4 +167,29 @@ async def test_ai_connection(request: AITestRequest):
             status="error",
             message=f"Koneksi Gagal: {clean_msg}"
         )
+
+
+from pydantic import BaseModel, Field
+
+class WebhookTestRequest(BaseModel):
+    webhook_url: str = Field(..., min_length=1, description="Webhook URL to test")
+
+
+@router.post("/settings/test-webhook")
+async def test_webhook(request: WebhookTestRequest):
+    """Menguji koneksi ke Make.com webhook URL."""
+    url = request.webhook_url.strip()
+
+    # Jika URL kosong atau masked, gunakan URL tersimpan
+    if not url or url.startswith("*"):
+        url = await get_setting("webhook_url")
+
+    if not url:
+        return {"status": "error", "message": "Webhook URL tidak boleh kosong."}
+
+    result = await test_make_webhook(url)
+    return {
+        "status": "success" if result["success"] else "error",
+        "message": result["message"],
+    }
 

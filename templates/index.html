@@ -388,7 +388,7 @@
                     </div>
 
                     <!-- Date + Interval Row -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
                         <div>
                             <label for="scheduleStartDate" class="block text-sm font-medium text-gray-300 mb-2">Tanggal Mulai</label>
                             <input type="date" id="scheduleStartDate" class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-gray-100 focus:outline-none focus:border-accent-purple/50 focus:ring-1 focus:ring-accent-purple/30 transition-all text-sm">
@@ -399,6 +399,13 @@
                                 <input type="number" id="scheduleInterval" min="1" value="2" class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-gray-100 focus:outline-none focus:border-accent-purple/50 focus:ring-1 focus:ring-accent-purple/30 transition-all text-sm pr-16">
                                 <span class="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-500">hari</span>
                             </div>
+                        </div>
+                        <div>
+                            <label for="scheduleModeSelect" class="block text-sm font-medium text-gray-300 mb-2">Mode Publikasi</label>
+                            <select id="scheduleModeSelect" class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-gray-100 focus:outline-none focus:border-accent-purple/50 focus:ring-1 focus:ring-accent-purple/30 transition-all text-sm appearance-none cursor-pointer">
+                                <option value="draft" class="bg-dark-900 text-gray-100">📝 Draft</option>
+                                <option value="live" class="bg-dark-900 text-gray-100">🚀 Live</option>
+                            </select>
                         </div>
                     </div>
 
@@ -438,6 +445,7 @@
                                     <th class="px-5 py-3">Topik</th>
                                     <th class="px-5 py-3">Bahasa</th>
                                     <th class="px-5 py-3">Jadwal Rilis</th>
+                                    <th class="px-5 py-3">Mode</th>
                                 </tr>
                             </thead>
                             <tbody id="schedulePreviewBody" class="divide-y divide-white/5 text-sm"></tbody>
@@ -681,12 +689,74 @@
                                 </div>
                             </div>
 
+                            <!-- Image Uploader Selection -->
+                            <div>
+                                <label for="settingImageUploader" class="block text-sm font-medium text-gray-300 mb-2">Penyedia Upload Gambar</label>
+                                <select id="settingImageUploader" onchange="toggleImgbbKeyVisibility()" class="w-full px-4 py-3 bg-dark-900/60 border border-white/10 rounded-xl text-gray-100 focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all text-sm appearance-none cursor-pointer">
+                                    <option value="catbox" class="bg-dark-900 text-gray-100">🐱 Catbox.moe (Gratis, Tanpa API Key)</option>
+                                    <option value="imgbb" class="bg-dark-900 text-gray-100">🖼️ ImgBB (Membutuhkan API Key)</option>
+                                </select>
+                            </div>
+
+                            <!-- ImgBB API Key Field -->
+                            <div id="imgbbApiKeyContainer" class="hidden">
+                                <label for="settingImgbbApiKey" class="block text-sm font-medium text-gray-300 mb-2">ImgBB API Key</label>
+                                <div class="relative">
+                                    <input type="password" id="settingImgbbApiKey" placeholder="Masukkan API Key ImgBB..."
+                                        class="w-full px-4 py-3 pr-10 bg-dark-900/60 border border-white/10 rounded-xl text-gray-100 placeholder-gray-500 focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all text-sm">
+                                    <button type="button" onclick="togglePasswordVisibility('settingImgbbApiKey')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                    </button>
+                                </div>
+                                <p class="mt-1 text-[10px] text-gray-500">Dapatkan API Key gratis di <a href="https://api.imgbb.com/" target="_blank" class="text-accent-cyan hover:underline font-medium">api.imgbb.com</a></p>
+                            </div>
+
                             <!-- Image Prompt Template -->
                             <div>
                                 <label for="settingImagePrompt" class="block text-sm font-medium text-gray-300 mb-2">Prompt Template</label>
                                 <textarea id="settingImagePrompt" rows="3" placeholder="A flat style vector illustration of [TOPIK], modern design, vibrant colors"
                                     class="w-full px-4 py-3 bg-dark-900/60 border border-white/10 rounded-xl text-gray-100 placeholder-gray-500 focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all text-sm resize-none"></textarea>
                                 <p class="mt-1 text-[10px] text-gray-500">Gunakan tag <strong>[TOPIK]</strong> sebagai placeholder topik artikel Anda.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Divider: Webhook / Make.com Auto Share Settings -->
+                    <div class="border-t border-white/5 pt-5 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-sm font-medium text-gray-300">Auto Share Sosial Media (Make.com)</h3>
+                                <p class="text-xs text-gray-500">Otomatis kirim notifikasi ke Make.com saat artikel terbit</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="settingWebhookEnabled" onchange="toggleWebhookSettings()" class="sr-only peer">
+                                <div class="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-300 after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-purple"></div>
+                            </label>
+                        </div>
+
+                        <!-- Webhook Settings Fields (toggled by switch) -->
+                        <div id="webhookSettingsFields" class="hidden space-y-4 pt-2">
+                            <!-- Webhook URL -->
+                            <div>
+                                <label for="settingWebhookUrl" class="block text-sm font-medium text-gray-300 mb-2">Webhook URL</label>
+                                <div class="relative">
+                                    <input type="text" id="settingWebhookUrl" placeholder="https://hook.eu2.make.com/xxxxxxxxxxxx"
+                                        class="w-full px-4 py-3 pr-10 bg-dark-900/60 border border-white/10 rounded-xl text-gray-100 placeholder-gray-500 focus:outline-none focus:border-accent-purple/50 focus:ring-2 focus:ring-accent-purple/20 transition-all text-sm">
+                                    <div class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+                                    </div>
+                                </div>
+                                <p class="mt-1 text-[10px] text-gray-500">Dapatkan URL dari <a href="https://www.make.com" target="_blank" class="text-accent-cyan hover:underline font-medium">Make.com</a> → Buat Scenario → module <strong>Webhooks</strong> → Custom Webhook</p>
+                            </div>
+
+                            <!-- Test Webhook Button -->
+                            <div>
+                                <button type="button" onclick="testWebhook()" id="testWebhookBtn"
+                                    class="w-full py-2.5 px-4 rounded-xl text-sm font-medium bg-accent-cyan/10 text-accent-cyan hover:bg-accent-cyan/20 transition-all flex items-center justify-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                    Test Webhook
+                                </button>
+                                <p id="webhookTestResult" class="mt-2 text-xs text-center hidden"></p>
                             </div>
                         </div>
                     </div>

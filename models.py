@@ -33,6 +33,11 @@ class SettingsRequest(BaseModel):
     image_base_url: Optional[str] = Field(None, description="Base URL Image Generator")
     image_model: Optional[str] = Field(None, description="Model Name Image Generator")
     image_prompt_template: Optional[str] = Field(None, description="Prompt Template for Image Generator")
+    image_uploader: Optional[str] = Field(None, description="Image upload provider: catbox/imgbb")
+    imgbb_api_key: Optional[str] = Field(None, description="API Key for ImgBB")
+    # Webhook Settings (Make.com)
+    webhook_enabled: Optional[bool] = Field(None, description="Enable Make.com webhook auto-share")
+    webhook_url: Optional[str] = Field(None, description="Make.com Webhook URL")
 
 
 class SettingsResponse(BaseModel):
@@ -56,6 +61,11 @@ class SettingsResponse(BaseModel):
     image_base_url: str = "https://api.premzone.co"
     image_model: str = "cx/gpt-5.5"
     image_prompt_template: str = "A flat style vector illustration of [TOPIK], modern design, vibrant colors, clean background"
+    image_uploader: str = "catbox"
+    imgbb_api_key: str = ""
+    # Webhook Settings (Make.com)
+    webhook_enabled: bool = False
+    webhook_url: str = ""
 
 
 
@@ -210,6 +220,7 @@ class ScheduleBatchRequest(BaseModel):
     interval_days: int = Field(2, ge=1, description="Interval hari antar topik")
     search_grounding: Optional[bool] = Field(False, description="Cari data terbaru via Google Search (Gemini)")
     dual_language: Optional[bool] = Field(False, description="Aktifkan dual bahasa (terjemahkan ke Inggris)")
+    status: Optional[str] = Field("draft", description="Mode publikasi: draft/live")
 
 
 
